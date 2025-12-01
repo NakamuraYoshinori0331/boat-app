@@ -1,0 +1,71 @@
+#############################
+# Python（FastAPI）
+#############################
+
+# Python bytecode / cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtualenv
+venv/
+env/
+
+# FastAPI local files
+backend/data/
+backend/models/
+backend/__pycache__/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Python logs
+*.log
+
+
+#############################
+# Node.js / React（Frontend）
+#############################
+
+# Dependency directories
+frontend/node_modules/
+
+# Build output
+frontend/build/
+frontend/dist/
+frontend/.vite/
+
+# Editor configs
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files（絶対に上げない）
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+frontend/.env.test
+
+#############################
+# OS / Misc
+#############################
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+
+# Zip / archives
+*.zip
+
+# Python / ML model artifacts
+*.pkl
+*.joblib
