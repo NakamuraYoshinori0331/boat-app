@@ -25,7 +25,6 @@ const PredictionResult: React.FC = () => {
       } else {
         console.error("予測データが不正です", parsed);
       }
-      console.log(parsed)
     } catch (e) {
       console.error("予測データの読み込みに失敗しました", e);
     }

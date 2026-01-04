@@ -14,6 +14,7 @@ const Training = () => {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(allFeatures);
+  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const handleTrain = async () => {
     try {
@@ -24,13 +25,12 @@ const Training = () => {
         model_name: values.model_name,
         start_date: values.start_date.format('YYYYMMDD'),
         end_date: values.end_date.format('YYYYMMDD'),
-        features: selectedFeatures
+        features: selectedFeatures,
+        user_email: localStorage.getItem("user_email")
       };
 
-      const response = await axios.post('http://localhost:8000/train', payload);
-      console.log(response)
+      const response = await axios.post(`${API_BASE}/train`, payload);
       if (response.status === 200) {
-        console.log("success")
         setModalVisible(true);
       } else {
         console.log("失敗")

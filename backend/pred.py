@@ -3,9 +3,9 @@ import pickle
 import utils
 
 
-def pred(model, date, place_id, race_no, top_n):
+def pred(model, models_dir, date, place_id, race_no, top_n):
     print("---------------------------------")
-    model_path = f"models/{model}"
+    model_path = f"{models_dir}/{model}"
     with open(f'{model_path}.pkl', 'rb') as f:
         models = pickle.load(f)
 

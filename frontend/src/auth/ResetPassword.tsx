@@ -1,44 +1,93 @@
-import { useState } from "react";
-import { Card, Form, Input, Button, message } from "antd";
-import axios from "axios";
+import React, { useState } from "react";
+import { Card, Input, Button, Form, message } from "antd";
+import { CognitoUser } from "amazon-cognito-identity-js";
+import UserPool from "../pages/UserPool";
+import { useNavigate } from "react-router-dom";
 
 export default function ResetPassword() {
-  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [sent, setSent] = useState(false);
 
-  const onFinish = async (values: any) => {
-    setLoading(true);
-    try {
-      // ※FastAPI側が /auth/reset-password を持っている想定
-      await axios.post("http://localhost:8000/auth/reset-password", values);
-      message.success("パスワード再設定メールを送信しました！");
-    } catch (e) {
-      message.error("送信に失敗しました");
+  // --- Step 1: Send Code ---
+  const sendCode = () => {
+    if (!email) {
+      message.error("メールアドレスを入力してください");
+      return;
     }
-    setLoading(false);
+
+    const user = new CognitoUser({
+      Username: email.trim(),
+      Pool: UserPool,
+    });
+
+    user.forgotPassword({
+      onSuccess: () => {
+        message.success("確認コードを送信しました！");
+        setSent(true);
+      },
+      onFailure: (err) => {
+        console.log(err);
+        message.error(err.message);
+      },
+    });
+  };
+
+  // --- Step 2: Confirm new password ---
+  const reset = (values: any) => {
+    const { code, newPassword } = values;
+
+    if (!email) {
+      message.error("メールアドレスがありません。最初からやり直してください。");
+      return;
+    }
+
+    const user = new CognitoUser({
+      Username: email.trim(),
+      Pool: UserPool,
+    });
+
+    // ★ confirmPassword 正しい書き方
+    console.log(code.trim());
+    console.log(newPassword);
+    user.confirmPassword(code.trim(), newPassword, {
+      onSuccess: () => navigate("/login"),
+      onFailure: (err) => {
+        console.log(err);
+        message.error(err.message || "パスワード変更に失敗しました");
+      },
+    });
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", marginTop: "10vh" }}>
-      <Card title="パスワード再設定" style={{ width: 380 }}>
-        <Form onFinish={onFinish} layout="vertical">
-
-          <Form.Item
-            label="登録メールアドレス"
-            name="email"
-            rules={[{ required: true, message: "メールアドレスを入力してください" }]}
-          >
-            <Input />
-          </Form.Item>
-
-          <Button type="primary" htmlType="submit" loading={loading} block>
-            再設定メールを送信
+    <Card title="パスワードリセット" style={{ width: 400, margin: "40px auto" }}>
+      {!sent ? (
+        <>
+          <Input
+            placeholder="メールアドレス"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Button type="primary" block onClick={sendCode} style={{ marginTop: 10 }}>
+            確認コード送信
           </Button>
-
-          <div style={{ textAlign: "center", marginTop: 10 }}>
-            <a href="/login">ログイン画面へ戻る</a>
-          </div>
+        </>
+      ) : (
+        <Form onFinish={reset}>
+          <Form.Item name="code" rules={[{ required: true }]}>
+            <Input placeholder="確認コード" />
+          </Form.Item>
+          <Form.Item name="newPassword" rules={[{ required: true }]}>
+            <Input.Password placeholder="新しいパスワード" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" block>
+            変更する
+          </Button>
         </Form>
-      </Card>
-    </div>
+      )}
+      <Button type="link" block onClick={() => navigate("/login")}>
+        ログインへ戻る
+      </Button>
+    </Card>
   );
 }

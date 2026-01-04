@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
 from typing import List
 import subprocess
@@ -9,9 +9,11 @@ import shutil
 from datetime import datetime
 import pred
 import simulate
-
+from auth import verify_token
 
 app = FastAPI()
+MODELS_DIR = "models"
+
 
 # CORS設定
 app.add_middleware(
@@ -29,6 +31,14 @@ class TrainRequest(BaseModel):
     start_date: str  # 'YYYY-MM-DD'
     end_date: str
     features: List[str]
+    user_email: str
+
+
+@app.get("/protected")
+async def protected_route(authorization: str = Header(None)):
+    token = authorization.replace("Bearer ", "")
+    claims = await verify_token(token)
+    return {"message": "OK", "user": claims["email"]}
 
 
 @app.post("/train")
@@ -40,7 +50,8 @@ def train_model(request: TrainRequest):
             "--model_name", request.model_name,
             "--start_date", request.start_date,
             "--end_date", request.end_date,
-            "--features", ",".join(request.features)
+            "--features", ",".join(request.features),
+            "--models_dir", MODELS_DIR
         ]
         print("Running command:", " ".join(cmd))
         subprocess.run(cmd, check=True)
@@ -49,7 +60,14 @@ def train_model(request: TrainRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-MODELS_DIR = "models"
+class EmailRequest(BaseModel):
+    user_email: str
+
+
+@app.post("/set_email")
+def set_email(request: EmailRequest):
+    global MODELS_DIR
+    MODELS_DIR = f"models/{request.user_email}"
 
 
 class RenameRequest(BaseModel):
@@ -59,6 +77,7 @@ class RenameRequest(BaseModel):
 @app.get("/models")
 def list_models():
     files = []
+    print(MODELS_DIR)
     for fname in os.listdir(MODELS_DIR):
         if fname.endswith(".pkl"):
             full_path = os.path.join(MODELS_DIR, fname)
@@ -114,6 +133,7 @@ async def predict(request: PredictRequest):
     try:
         result = pred.pred(
             request.model.replace(".pkl", ""),
+            MODELS_DIR,
             request.date,
             request.place_id,
             str(request.race_no),
@@ -141,6 +161,7 @@ async def simulation(request: SimulateRequest):
     try:
         result = simulate.simulate(
             request.model.replace(".pkl", ""),
+            MODELS_DIR,
             request.start_date,
             request.end_date,
             request.top_n,

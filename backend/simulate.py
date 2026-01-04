@@ -6,11 +6,11 @@ from tqdm import tqdm
 import utils
 
 
-def simulate(model, start_date, end_date, top_n, min_odds, max_odds, min_probability):
+def simulate(model, models_dir, start_date, end_date, top_n, min_odds, max_odds, min_probability):
     all_start = time.time()
 
     # モデル読み込み
-    model_path = f"models/{model}.pkl"
+    model_path = f"{models_dir}/{model}.pkl"
     with open(model_path, "rb") as f:
         models = pickle.load(f)
 

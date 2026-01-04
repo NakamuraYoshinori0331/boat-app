@@ -20,6 +20,7 @@ parser.add_argument("--model_name", default="model", help="model_name")
 parser.add_argument("--start_date", default="20210101", help="input start date")
 parser.add_argument("--end_date", default="20210110", help="input end date")
 parser.add_argument("--features", default="全国勝率", help="features")
+parser.add_argument("--models_dir", default="", help="localstorage")
 
 args = parser.parse_args()
 
@@ -101,8 +102,12 @@ models = {
 }
 
 # カレントディレクトリへモデルを保存
-file = f'models/{args.model_name}.pkl'
+dir = args.models_dir
+file = f'{dir}/{args.model_name}.pkl'
+# ディレクトリが存在するか確認
+if not os.path.exists(dir):
+    os.makedirs(dir)
 pickle.dump(models, open(file, 'wb'))
 
-gbm = pickle.load(open(f'models/{args.model_name}.pkl', 'rb'))
-print(f"モデルを保存しました：models/{args.model_name}.pkl")
+gbm = pickle.load(open(f'{dir}/{args.model_name}.pkl', 'rb'))
+print(f"モデルを保存しました：{dir}/{args.model_name}.pkl")

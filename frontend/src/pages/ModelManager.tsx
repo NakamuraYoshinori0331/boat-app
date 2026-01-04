@@ -7,25 +7,26 @@ const ModelManager: React.FC = () => {
   const [models, setModels] = useState([]);
   const [renamingModel, setRenamingModel] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
+  const API_BASE = process.env.REACT_APP_API_BASE;
 
   useEffect(() => {
     fetchModels();
   }, []);
 
   const fetchModels = async () => {
-    const res = await axios.get('http://localhost:8000/models');
+    const res = await axios.get(`${API_BASE}/models`);
     setModels(res.data);
   };
 
   const handleDelete = async (name: string) => {
-    await axios.delete(`http://localhost:8000/models/${name}`);
+    await axios.delete(`${API_BASE}/models/${name}`);
     message.success('削除しました');
     fetchModels();
   };
 
   const handleRename = async () => {
     if (!renamingModel || !newName) return;
-    await axios.put(`http://localhost:8000/models/${renamingModel}`, { new_name: newName });
+    await axios.put(`${API_BASE}/models/${renamingModel}`, { new_name: newName });
     message.success('リネームしました');
     setRenamingModel(null);
     setNewName('');
@@ -33,7 +34,7 @@ const ModelManager: React.FC = () => {
   };
 
   const handleDownload = (name: string) => {
-    window.open(`http://localhost:8000/models/${name}/download`, '_blank');
+    window.open(`${API_BASE}/models/${name}/download`, '_blank');
   };
 
   const columns = [

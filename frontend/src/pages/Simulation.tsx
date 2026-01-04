@@ -13,10 +13,11 @@ const Simulation = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get('http://localhost:8000/models');
+      const res = await axios.get(`${API_BASE}/models`);
       setModels(res.data);
     } catch (e) {
       message.error("モデルの取得に失敗しました");
@@ -42,7 +43,7 @@ const Simulation = () => {
     console.log("送信ペイロード：", payload);
 
     try {
-      const res = await axios.post('http://localhost:8000/simulation', payload);
+      const res = await axios.post(`${API_BASE}/simulation`, payload);
 
       // バックエンドの結果を受け取る
       const result = res.data.simulation;
