@@ -11,11 +11,14 @@ __pycache__/
 # Virtualenv
 venv/
 env/
+.env
 
 # FastAPI local files
 backend/data/
 backend/models/
 backend/__pycache__/
+backend/venv
+backend/models/*.pkl
 
 # Jupyter
 .ipynb_checkpoints/
