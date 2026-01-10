@@ -19,8 +19,8 @@ MODELS_DIR = "models"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # "https://boat-ai.click",
-        "*"
+        "https://boat-ai.click",
+        # "*"
     ],
     allow_credentials=True,
     allow_methods=["*"],
