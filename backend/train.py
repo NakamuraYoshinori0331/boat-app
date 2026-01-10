@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--model_name", default="model", help="model_name")
 parser.add_argument("--start_date", default="20210101", help="input start date")
 parser.add_argument("--end_date", default="20210110", help="input end date")
+parser.add_argument("--stadium", default="ALL", help="input stadium")
 parser.add_argument("--features", default="全国勝率", help="features")
 parser.add_argument("--models_dir", default="", help="localstorage")
 
@@ -27,8 +28,16 @@ args = parser.parse_args()
 # データの開始日と終了日を取得
 start_date = args.start_date
 end_date = args.end_date
+stadium = args.stadium
 
 race_data, odds_data = utils.get_data(start_date, end_date)
+
+# レース場フィルタ
+if stadium != "ALL":
+    race_data = race_data[race_data["レース場"] == int(stadium)]
+    odds_data = odds_data[
+        odds_data["レースID"].str.contains(f"_{stadium}_")
+    ]
 
 # 組番を1,2,3位に分解
 odds_data[['1位', '2位', '3位']] = odds_data['組番'].str.extract(r'\((\d+), (\d+), (\d+)\)').astype(int)

@@ -50,7 +50,7 @@ const AppLayout: React.FC = () => {
     <Layout style={{ minHeight: "100vh" }}>
       <Header style={{ color: "white", fontSize: "1.5rem" }}>🚤 競艇3連単 予測ツール</Header>
       <Layout>
-        {(!window.location.pathname.includes('login'))
+        {(localStorage.getItem("accessToken") && localStorage.getItem("user_email"))
           ? 
             <Sider 
               collapsible
