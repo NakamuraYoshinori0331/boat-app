@@ -18,11 +18,21 @@ MODELS_DIR = "models"
 # CORS設定
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # http://localhost:3000 等
+    allow_origins=[
+        "https://boat-ai.click",
+        # "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 
 # 学習用リクエストパラメータ
@@ -30,6 +40,7 @@ class TrainRequest(BaseModel):
     model_name: str
     start_date: str  # 'YYYY-MM-DD'
     end_date: str
+    stadium: str
     features: List[str]
     user_email: str
 
@@ -50,6 +61,7 @@ def train_model(request: TrainRequest):
             "--model_name", request.model_name,
             "--start_date", request.start_date,
             "--end_date", request.end_date,
+            "--stadium", request.stadium,
             "--features", ",".join(request.features),
             "--models_dir", MODELS_DIR
         ]
@@ -149,6 +161,7 @@ class SimulateRequest(BaseModel):
     model: str
     start_date: str
     end_date: str
+    stadium: str
     top_n:  int
     min_odds: float
     max_odds: float
@@ -164,6 +177,7 @@ async def simulation(request: SimulateRequest):
             MODELS_DIR,
             request.start_date,
             request.end_date,
+            request.stadium,
             request.top_n,
             request.min_odds,
             request.max_odds,

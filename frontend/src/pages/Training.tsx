@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col } from 'antd';
+import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select } from 'antd';
 import axios from 'axios';
 import dayjs from 'dayjs';
 
@@ -25,6 +25,7 @@ const Training = () => {
         model_name: values.model_name,
         start_date: values.start_date.format('YYYYMMDD'),
         end_date: values.end_date.format('YYYYMMDD'),
+        stadium: values.stadium,
         features: selectedFeatures,
         user_email: localStorage.getItem("user_email")
       };
@@ -46,7 +47,38 @@ const Training = () => {
   const onCheckAll = () => setSelectedFeatures(allFeatures);
   const onUncheckAll = () => setSelectedFeatures([]);
   const onFeatureChange = (checkedValues: any) => setSelectedFeatures(checkedValues);
-
+  const minDate = dayjs('2021-01-01');
+  const maxDate = dayjs('2021-11-24');
+  const STADIUM_MAP: Record<string, string> = {
+    'ALL': '全レース場',
+    '01': '桐生',
+    '02': '戸田',
+    '03': '江戸川',
+    '04': '平和島',
+    '05': '多摩川',
+    '06': '浜名湖',
+    '07': '蒲郡',
+    '08': '常滑',
+    '09': '津',
+    '10': '三国',
+    '11': 'びわこ',
+    '12': '住之江',
+    '13': '尼崎',
+    '14': '鳴門',
+    '15': '丸亀',
+    '16': '児島',
+    '17': '宮島',
+    '18': '徳山',
+    '19': '下関',
+    '20': '若松',
+    '21': '芦屋',
+    '22': '福岡',
+    '23': '唐津',
+    '24': '大村',
+  };
+  const STADIUM_OPTIONS = Object.entries(STADIUM_MAP).map(
+    ([value, label]) => ({ value, label })
+  );
   return (
     <>
       <Form
@@ -55,7 +87,8 @@ const Training = () => {
         initialValues={{
           model_name: '',
           start_date: dayjs('2021-01-01'),
-          end_date: dayjs('2021-01-28')
+          end_date: dayjs('2021-01-28'),
+          stadium: 'ALL'
         }}
       >
         <Form.Item label="モデル名" name="model_name" rules={[{ required: true, message: 'モデル名を入力してください' }]}>
@@ -63,11 +96,31 @@ const Training = () => {
         </Form.Item>
 
         <Form.Item label="データ開始日" name="start_date" rules={[{ required: true }]}>
-          <DatePicker format="YYYY-MM-DD" />
+          <DatePicker
+            format="YYYY-MM-DD"
+            disabledDate={(current) =>
+              current && (current.isBefore(minDate) || current.isAfter(maxDate))
+            }
+          />
         </Form.Item>
 
         <Form.Item label="データ終了日" name="end_date" rules={[{ required: true }]}>
-          <DatePicker format="YYYY-MM-DD" />
+          <DatePicker
+            format="YYYY-MM-DD"
+            disabledDate={(current) =>
+              current && (current.isBefore(minDate) || current.isAfter(maxDate))
+            }
+          />
+        </Form.Item>
+        <Form.Item
+          label="レース場"
+          name="stadium"
+          rules={[{ required: true, message: 'レース場を選択してください' }]}
+        >
+          <Select
+            placeholder="レース場を選択"
+            options={STADIUM_OPTIONS}
+          />
         </Form.Item>
 
         <Form.Item label="使用する特徴量">

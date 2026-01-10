@@ -34,6 +34,7 @@ const Simulation = () => {
       model: values.model,
       start_date: values.daterange[0].format('YYYYMMDD'),
       end_date: values.daterange[1].format('YYYYMMDD'),
+      stadium: values.stadium,
       top_n: values.top_n,
       min_odds: values.min_odds,
       max_odds: values.max_odds,
@@ -68,7 +69,38 @@ const Simulation = () => {
 
     setLoading(false);
   };
-
+  const minDate = dayjs('2021-01-01');
+  const maxDate = dayjs('2021-11-24');
+  const STADIUM_MAP: Record<string, string> = {
+    'ALL': '全レース場',
+    '01': '桐生',
+    '02': '戸田',
+    '03': '江戸川',
+    '04': '平和島',
+    '05': '多摩川',
+    '06': '浜名湖',
+    '07': '蒲郡',
+    '08': '常滑',
+    '09': '津',
+    '10': '三国',
+    '11': 'びわこ',
+    '12': '住之江',
+    '13': '尼崎',
+    '14': '鳴門',
+    '15': '丸亀',
+    '16': '児島',
+    '17': '宮島',
+    '18': '徳山',
+    '19': '下関',
+    '20': '若松',
+    '21': '芦屋',
+    '22': '福岡',
+    '23': '唐津',
+    '24': '大村',
+  };
+  const STADIUM_OPTIONS = Object.entries(STADIUM_MAP).map(
+    ([value, label]) => ({ value, label })
+  );
   return (
     <div>
       <Title level={3}>🎲 シミュレーション</Title>
@@ -101,10 +133,27 @@ const Simulation = () => {
           name="daterange"
           rules={[{ required: true, message: '日付範囲を指定してください' }]}
         >
-          <RangePicker />
+          <RangePicker
+            format="YYYY-MM-DD"
+            disabledDate={(current) =>
+              current &&
+              (current.isBefore(minDate) || current.isAfter(maxDate))
+            }
+          />
         </Form.Item>
 
         <Divider orientation="left">🎯 詳細ルール</Divider>
+
+        <Form.Item
+          label="レース場"
+          name="stadium"
+          rules={[{ required: true, message: 'レース場を選択してください' }]}
+        >
+          <Select
+            placeholder="レース場を選択"
+            options={STADIUM_OPTIONS}
+          />
+        </Form.Item>
 
         <Form.Item label="上位N通り" name="top_n">
           <InputNumber min={1} max={50} style={{ width: '100%' }} />

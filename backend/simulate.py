@@ -6,7 +6,7 @@ from tqdm import tqdm
 import utils
 
 
-def simulate(model, models_dir, start_date, end_date, top_n, min_odds, max_odds, min_probability):
+def simulate(model, models_dir, start_date, end_date, stadium, top_n, min_odds, max_odds, min_probability):
     all_start = time.time()
 
     # モデル読み込み
@@ -16,6 +16,13 @@ def simulate(model, models_dir, start_date, end_date, top_n, min_odds, max_odds,
 
     # データ取得
     race_data, odds_data = utils.get_data(start_date, end_date)
+    # レース場フィルタ
+    if stadium != "ALL":
+        race_data = race_data[race_data["レース場"] == int(stadium)]
+        odds_data = odds_data[
+            odds_data["レースID"].str.contains(f"_{stadium}_")
+        ]
+
     odds_data[["1位", "2位", "3位"]] = odds_data["組番"].str.extract(
         r"\((\d+), (\d+), (\d+)\)"
     ).astype(int)

@@ -25,12 +25,11 @@ export default function Login() {
       
         localStorage.setItem("accessToken", session.getIdToken().getJwtToken());
         localStorage.setItem("refreshToken", session.getRefreshToken().getToken());
-        localStorage.setItem("user_email", email);
         const payload = {
-          user_email: localStorage.getItem("user_email")
+          user_email: email
         };
-        console.log("post_email");
         await axios.post(`${API_BASE}/set_email`, payload);
+        localStorage.setItem("user_email", email);
         navigate("/training");
       },
       onFailure: (err) => {
