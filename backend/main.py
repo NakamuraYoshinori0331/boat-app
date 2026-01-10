@@ -10,6 +10,7 @@ from datetime import datetime
 import pred
 import simulate
 from auth import verify_token
+import sys
 
 app = FastAPI()
 MODELS_DIR = "models"
@@ -57,7 +58,7 @@ def train_model(request: TrainRequest):
     try:
         # ここでは train.py を CLI で呼び出す例（中身を直接呼ぶ形にも後で改良可能）
         cmd = [
-            "python", "train.py",
+            sys.executable, "train.py",
             "--model_name", request.model_name,
             "--start_date", request.start_date,
             "--end_date", request.end_date,
