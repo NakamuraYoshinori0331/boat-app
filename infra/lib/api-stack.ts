@@ -1,55 +1,45 @@
+import * as path from "path";
 import * as cdk from "aws-cdk-lib";
+import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
-import * as authorizers from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53targets from "aws-cdk-lib/aws-route53-targets";
+import * as s3 from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import { config } from "./config";
 
-/**
- * Phase 2: FastAPI を Lambda コンテナ + Fargate ジョブに移行する際の API 基盤。
- * 現時点ではヘルスチェック Lambda のみ。本番 API 移行時に FastAPI ハンドラを差し替える。
- */
+export interface ApiStackProps extends cdk.StackProps {
+  dataBucket: s3.IBucket;
+  modelsBucket: s3.IBucket;
+}
+
 export class ApiStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
-    const userPool = cognito.UserPool.fromUserPoolId(
-      this,
-      "UserPool",
-      config.cognitoUserPoolId,
-    );
-
-    const authorizer = new authorizers.HttpUserPoolAuthorizer(
-      "CognitoAuthorizer",
-      userPool,
-      {
-        userPoolClients: [
-          cognito.UserPoolClient.fromUserPoolClientId(
-            this,
-            "UserPoolClient",
-            config.cognitoClientId,
-          ),
-        ],
+    const apiFn = new lambda.DockerImageFunction(this, "ApiFunction", {
+      code: lambda.DockerImageCode.fromImageAsset(
+        path.join(__dirname, "../../backend"),
+      ),
+      memorySize: 2048,
+      timeout: cdk.Duration.minutes(15),
+      environment: {
+        DATA_BUCKET: props.dataBucket.bucketName,
+        MODELS_BUCKET: props.modelsBucket.bucketName,
+        DATA_DIR: "/tmp/data",
+        MODELS_ROOT: "/tmp/models",
+        COGNITO_USER_POOL_ID: config.cognitoUserPoolId,
+        COGNITO_CLIENT_ID: config.cognitoClientId,
+        ALLOWED_ORIGINS: `https://${config.domainName},http://localhost:3000`,
       },
-    );
-
-    const healthFn = new lambda.Function(this, "HealthFunction", {
-      runtime: lambda.Runtime.PYTHON_3_12,
-      handler: "index.handler",
-      code: lambda.Code.fromInline(`
-def handler(event, context):
-    return {
-        "statusCode": 200,
-        "headers": {"content-type": "application/json"},
-        "body": "{\\"status\\":\\"ok\\",\\"service\\":\\"boat-app-api\\"}"
-    }
-`),
-      timeout: cdk.Duration.seconds(10),
       logRetention: logs.RetentionDays.ONE_WEEK,
     });
+
+    props.dataBucket.grantRead(apiFn);
+    props.modelsBucket.grantReadWrite(apiFn);
 
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
       apiName: "boat-app-api",
@@ -66,31 +56,67 @@ def handler(event, context):
       },
     });
 
+    const integration = new integrations.HttpLambdaIntegration(
+      "ApiIntegration",
+      apiFn,
+    );
+
     httpApi.addRoutes({
-      path: "/health",
-      methods: [apigatewayv2.HttpMethod.GET],
-      integration: new integrations.HttpLambdaIntegration(
-        "HealthIntegration",
-        healthFn,
-      ),
+      path: "/{proxy+}",
+      methods: [apigatewayv2.HttpMethod.ANY],
+      integration,
     });
 
     httpApi.addRoutes({
-      path: "/protected",
-      methods: [apigatewayv2.HttpMethod.GET],
+      path: "/",
+      methods: [apigatewayv2.HttpMethod.ANY],
       integration: new integrations.HttpLambdaIntegration(
-        "ProtectedIntegration",
-        healthFn,
+        "RootIntegration",
+        apiFn,
       ),
-      authorizer,
+    });
+
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+      this,
+      "HostedZone",
+      {
+        hostedZoneId: config.hostedZoneId,
+        zoneName: config.domainName,
+      },
+    );
+
+    const certificate = new acm.Certificate(this, "ApiCertificate", {
+      domainName: config.apiDomainName,
+      validation: acm.CertificateValidation.fromDns(hostedZone),
+    });
+
+    const domainName = new apigatewayv2.DomainName(this, "ApiDomainName", {
+      domainName: config.apiDomainName,
+      certificate,
+    });
+
+    new apigatewayv2.ApiMapping(this, "ApiMapping", {
+      api: httpApi,
+      domainName,
+      stage: httpApi.defaultStage!,
+    });
+
+    new route53.ARecord(this, "ApiAliasRecord", {
+      zone: hostedZone,
+      recordName: "api",
+      target: route53.RecordTarget.fromAlias(
+        new route53targets.ApiGatewayv2DomainProperties(
+          domainName.regionalDomainName,
+          domainName.regionalHostedZoneId,
+        ),
+      ),
     });
 
     new cdk.CfnOutput(this, "HttpApiUrl", {
       value: httpApi.apiEndpoint,
     });
-    new cdk.CfnOutput(this, "ApiDomainTarget", {
-      value: `${httpApi.apiId}.execute-api.${config.region}.amazonaws.com`,
-      description: "Route53 api.boat-ai.click の CNAME/Alias 先（カスタムドメイン設定時）",
+    new cdk.CfnOutput(this, "CustomApiUrl", {
+      value: `https://${config.apiDomainName}`,
     });
   }
 }

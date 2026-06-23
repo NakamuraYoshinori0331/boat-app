@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
     paths:
       - "infra/**"
+      - "backend/**"
       - ".github/workflows/deploy-infra.yml"
   workflow_dispatch:
 
@@ -36,6 +37,31 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Remove legacy EC2 API DNS record (if any)
+        run: |
+          RECORD=$(aws route53 list-resource-record-sets \
+            --hosted-zone-id Z08328995IC1UT7ZFPO \
+            --query "ResourceRecordSets[?Name=='api.boat-ai.click.' && Type=='A' && !AliasTarget]" \
+            --output json)
+          if [ "$RECORD" != "[]" ]; then
+            IP=$(echo "$RECORD" | jq -r '.[0].ResourceRecords[0].Value')
+            TTL=$(echo "$RECORD" | jq -r '.[0].TTL')
+            aws route53 change-resource-record-sets --hosted-zone-id Z08328995IC1UT7ZFPO --change-batch "$(cat <<EOF
+          {
+            "Changes": [{
+              "Action": "DELETE",
+              "ResourceRecordSet": {
+                "Name": "api.boat-ai.click",
+                "Type": "A",
+                "TTL": $TTL,
+                "ResourceRecords": [{"Value": "$IP"}]
+              }
+            }]
+          }
+          EOF
+          )"
+          fi
 
       - name: CDK deploy
         working-directory: infra

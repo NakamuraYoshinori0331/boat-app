@@ -7,6 +7,7 @@ from typing import List
 
 import pred
 import simulate
+import storage
 from auth import get_current_user, get_user_email
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,8 @@ app.add_middleware(
 
 def models_dir_for_user(claims: dict) -> str:
     email = get_user_email(claims)
+    if os.environ.get("MODELS_BUCKET"):
+        return storage.ensure_models_dir(email)
     path = os.path.join("models", email)
     os.makedirs(path, exist_ok=True)
     return path
@@ -93,7 +96,12 @@ def train_model(
             "--features", ",".join(request.features),
             "--models_dir", models_dir,
         ]
-        subprocess.run(cmd, check=True)
+        subprocess.run(
+            cmd,
+            check=True,
+            cwd=os.environ.get("LAMBDA_TASK_ROOT"),
+        )
+        storage.sync_models_to_s3(get_user_email(claims))
         return {"message": "学習完了"}
     except subprocess.CalledProcessError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -125,6 +133,7 @@ def delete_model(name: str, claims: dict = Depends(get_current_user)):
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="モデルが存在しません")
     os.remove(path)
+    storage.delete_model_from_s3(get_user_email(claims), name)
     return {"message": "削除しました"}
 
 
@@ -140,6 +149,9 @@ def rename_model(
     if not os.path.exists(old_path):
         raise HTTPException(status_code=404, detail="モデルが存在しません")
     shutil.move(old_path, new_path)
+    email = get_user_email(claims)
+    storage.delete_model_from_s3(email, name)
+    storage.upload_model(email, f"{req.new_name}.pkl")
     return {"message": "リネームしました"}
 
 

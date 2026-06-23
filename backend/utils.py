@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import numpy as np
 import glob
@@ -7,13 +9,23 @@ import itertools
 from bs4 import BeautifulSoup
 
 
+def _data_dir() -> str:
+    return os.environ.get("DATA_DIR", "data")
+
+
 def get_data(start_date, end_date):
-    # 日付の範囲をリスト化
+    try:
+        import storage
+
+        storage.ensure_data_files(start_date, end_date)
+    except ImportError:
+        pass
+
+    data_dir = _data_dir()
     date_range = pd.date_range(start=start_date, end=end_date).strftime("%Y%m%d")
 
-    # パターンを動的に作成
-    race_files = [f"data/race_{date}.csv" for date in date_range]
-    odds_files = [f"data/odds_{date}.csv" for date in date_range]
+    race_files = [f"{data_dir}/race_{date}.csv" for date in date_range]
+    odds_files = [f"{data_dir}/odds_{date}.csv" for date in date_range]
 
     # 実際に存在するファイルのみ取得
     race_files = [file for file in race_files if glob.glob(file)]

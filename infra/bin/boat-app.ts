@@ -12,8 +12,12 @@ const env = {
   region: config.region,
 };
 
-new DataStack(app, "BoatAppDataStack", { env });
-new ApiStack(app, "BoatAppApiStack", { env });
+const dataStack = new DataStack(app, "BoatAppDataStack", { env });
+new ApiStack(app, "BoatAppApiStack", {
+  env,
+  dataBucket: dataStack.dataBucket,
+  modelsBucket: dataStack.modelsBucket,
+});
 new GitHubOidcStack(app, "BoatAppGitHubOidcStack", { env });
 
 app.synth();

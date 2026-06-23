@@ -1,0 +1,16 @@
+fastapi
+mangum
+uvicorn[standard]
+pydantic
+python-jose[cryptography]
+pandas
+numpy
+lightgbm
+scikit-learn
+joblib
+matplotlib
+japanize-matplotlib
+beautifulsoup4
+requests
+tqdm
+boto3
