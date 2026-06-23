@@ -1,61 +1,80 @@
 import json
+import os
 import ssl
 import urllib.request
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt, JWTError
 
-# ===== Cognito 設定 =====
-USER_POOL_ID = "ap-northeast-1_wWPruxvu0"
-CLIENT_ID = "6lv369imhln4tsvor6qa2hh2if"
-REGION = "ap-northeast-1"
+USER_POOL_ID = os.getenv("COGNITO_USER_POOL_ID", "ap-northeast-1_wWPruxvu0")
+CLIENT_ID = os.getenv("COGNITO_CLIENT_ID", "6lv369imhln4tsvor6qa2hh2if")
+REGION = os.getenv("AWS_REGION", "ap-northeast-1")
 
-# ===== JWKS（公開鍵）取得 =====
 JWKS_URL = f"https://cognito-idp.{REGION}.amazonaws.com/{USER_POOL_ID}/.well-known/jwks.json"
 
-# 🔥 Windows の SSL エラーを回避するために証明書検証を OFF にする
-ssl_context = ssl._create_unverified_context()
+_ssl_context = ssl.create_default_context()
+if os.getenv("DISABLE_SSL_VERIFY", "").lower() in ("1", "true", "yes"):
+    _ssl_context.check_hostname = False
+    _ssl_context.verify_mode = ssl.CERT_NONE
 
-try:
-    jwks_json = urllib.request.urlopen(JWKS_URL, context=ssl_context).read()
-    jwks = json.loads(jwks_json)["keys"]
-except Exception as e:
-    print("❌ JWKS の取得に失敗:", e)
-    jwks = []
+security = HTTPBearer(auto_error=False)
 
 
-def verify_token(token: str):
-    """
-    Cognito JWT を検証する。
-    正常なら payload（ユーザー情報）を返す。
-    エラーなら False を返す。
-    """
+def _load_jwks() -> list:
+    try:
+        jwks_json = urllib.request.urlopen(JWKS_URL, context=_ssl_context, timeout=10).read()
+        return json.loads(jwks_json)["keys"]
+    except Exception as exc:
+        print("JWKS fetch failed:", exc)
+        return []
+
+
+JWKS = _load_jwks()
+
+
+def verify_token(token: str) -> dict:
+    if not token:
+        raise HTTPException(status_code=401, detail="認証トークンがありません")
+
     if token.startswith("Bearer "):
         token = token.replace("Bearer ", "")
 
-    # JWT header から kid を取得
     try:
         header = jwt.get_unverified_header(token)
         kid = header["kid"]
-    except JWTError:
-        print("❌ トークンのヘッダー解析に失敗")
-        return False
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="トークンの形式が不正です") from exc
 
-    # kid に対応する公開鍵（JWKS）を探す
-    key = next((k for k in jwks if k["kid"] == kid), None)
+    key = next((k for k in JWKS if k["kid"] == kid), None)
     if key is None:
-        print("❌ JWKS に一致する kid がない")
-        return False
+        JWKS.extend(_load_jwks())
+        key = next((k for k in JWKS if k["kid"] == kid), None)
+    if key is None:
+        raise HTTPException(status_code=401, detail="トークンの検証に失敗しました")
 
-    # 署名検証
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             key,
             algorithms=["RS256"],
             audience=CLIENT_ID,
-            options={"verify_exp": True}
+            options={"verify_exp": True},
         )
-        return payload
+    except JWTError as exc:
+        raise HTTPException(status_code=401, detail="トークンが無効です") from exc
 
-    except JWTError as e:
-        print("❌ JWT デコードエラー:", e)
-        return False
+
+def get_user_email(claims: dict) -> str:
+    email = claims.get("email") or claims.get("cognito:username")
+    if not email:
+        raise HTTPException(status_code=401, detail="ユーザー情報を取得できません")
+    return email
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> dict:
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(status_code=401, detail="認証が必要です")
+    return verify_token(credentials.credentials)

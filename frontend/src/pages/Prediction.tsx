@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Select, InputNumber, Button, DatePicker, message } from 'antd';
 import dayjs from 'dayjs';
-import axios from 'axios';
+import api from '../api/client';
 import { useNavigate } from 'react-router-dom';
 
 const { Option } = Select;
@@ -10,7 +10,6 @@ const Prediction = () => {
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const places = [
     ['01', '桐生'], ['02', '戸田'], ['03', '江戸川'], ['04', '平和島'], ['05', '多摩川'], ['06', '浜名湖'],
@@ -21,7 +20,7 @@ const Prediction = () => {
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/models`);
+      const res = await api.get('/models');
       setModels(res.data);
     } catch (e) {
       message.error("モデルの取得に失敗しました");
@@ -43,14 +42,11 @@ const Prediction = () => {
     };
 
     try {
-      const res = await axios.post(`${API_BASE}/predict`, payload);
+      const res = await api.post('/predict', payload);
       if (res.data["predictions"].length == 0){
         throw new Error("結果がありません。");
       }
-      // 結果をlocalStorageに保存
       localStorage.setItem("predictions", JSON.stringify(res.data));
-      
-      // 結果表示ページに遷移
       navigate("/results");
       message.success('予測が完了しました');
     } catch (e) {

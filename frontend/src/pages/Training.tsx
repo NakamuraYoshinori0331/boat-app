@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select } from 'antd';
-import axios from 'axios';
+import api from '../api/client';
 import dayjs from 'dayjs';
 
 const allFeatures = [
@@ -14,7 +14,6 @@ const Training = () => {
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(allFeatures);
-  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const handleTrain = async () => {
     try {
@@ -27,10 +26,9 @@ const Training = () => {
         end_date: values.end_date.format('YYYYMMDD'),
         stadium: values.stadium,
         features: selectedFeatures,
-        user_email: localStorage.getItem("user_email")
       };
 
-      const response = await axios.post(`${API_BASE}/train`, payload);
+      const response = await api.post('/train', payload);
       if (response.status === 200) {
         setModalVisible(true);
       } else {

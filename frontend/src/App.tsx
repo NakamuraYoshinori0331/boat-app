@@ -50,7 +50,7 @@ const AppLayout: React.FC = () => {
     <Layout style={{ minHeight: "100vh" }}>
       <Header style={{ color: "white", fontSize: "1.5rem" }}>🚤 競艇3連単 予測ツール</Header>
       <Layout>
-        {(localStorage.getItem("accessToken") && localStorage.getItem("user_email"))
+        {(localStorage.getItem("accessToken"))
           ? 
             <Sider 
               collapsible
@@ -94,6 +94,7 @@ const AppLayout: React.FC = () => {
         <Layout style={{ padding: "24px" }}>
           <Content>
             <Routes>
+              <Route path="/" element={<Navigate to="/training" replace />} />
               <Route
                 path="/training"
                 element={

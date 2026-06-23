@@ -13,6 +13,7 @@
     "@types/react-dom": "^19.1.1",
     "amazon-cognito-identity-js": "^6.3.16",
     "antd": "^5.24.6",
+    "axios": "^1.13.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^6.6.1",

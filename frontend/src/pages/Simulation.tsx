@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Select, DatePicker, InputNumber, Typography, Divider, message } from 'antd';
 import dayjs from 'dayjs';
-import axios from 'axios';
+import api from '../api/client';
 import { useNavigate } from 'react-router-dom';
 
 const { Option } = Select;
@@ -13,11 +13,10 @@ const Simulation = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [form] = Form.useForm();
-  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get(`${API_BASE}/models`);
+      const res = await api.get('/models');
       setModels(res.data);
     } catch (e) {
       message.error("モデルの取得に失敗しました");
@@ -44,7 +43,7 @@ const Simulation = () => {
     console.log("送信ペイロード：", payload);
 
     try {
-      const res = await axios.post(`${API_BASE}/simulation`, payload);
+      const res = await api.post('/simulation', payload);
 
       // バックエンドの結果を受け取る
       const result = res.data.simulation;

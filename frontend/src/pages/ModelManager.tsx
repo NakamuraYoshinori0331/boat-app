@@ -1,40 +1,47 @@
 // src/pages/ModelManager.tsx
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Popconfirm, Input, Modal, message, Space } from 'antd';
-import axios from 'axios';
+import api from '../api/client';
 
 const ModelManager: React.FC = () => {
   const [models, setModels] = useState([]);
   const [renamingModel, setRenamingModel] = useState<string | null>(null);
   const [newName, setNewName] = useState('');
-  const API_BASE = process.env.REACT_APP_API_BASE;
 
   useEffect(() => {
     fetchModels();
   }, []);
 
   const fetchModels = async () => {
-    const res = await axios.get(`${API_BASE}/models`);
+    const res = await api.get('/models');
     setModels(res.data);
   };
 
   const handleDelete = async (name: string) => {
-    await axios.delete(`${API_BASE}/models/${name}`);
+    await api.delete(`/models/${name}`);
     message.success('削除しました');
     fetchModels();
   };
 
   const handleRename = async () => {
     if (!renamingModel || !newName) return;
-    await axios.put(`${API_BASE}/models/${renamingModel}`, { new_name: newName });
+    await api.put(`/models/${renamingModel}`, { new_name: newName });
     message.success('リネームしました');
     setRenamingModel(null);
     setNewName('');
     fetchModels();
   };
 
-  const handleDownload = (name: string) => {
-    window.open(`${API_BASE}/models/${name}/download`, '_blank');
+  const handleDownload = async (name: string) => {
+    const res = await api.get(`/models/${name}/download`, { responseType: 'blob' });
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', name);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
   };
 
   const columns = [

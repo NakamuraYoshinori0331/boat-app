@@ -26,6 +26,10 @@ backend/models/*.pkl
 # Python logs
 *.log
 
+# CDK / Infra
+infra/node_modules/
+infra/cdk.out/
+
 
 #############################
 # Node.js / React（Frontend）

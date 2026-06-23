@@ -3,12 +3,9 @@ import { Form, Input, Button, Card, message } from "antd";
 import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import UserPool from "../pages/UserPool";
 import { useNavigate } from "react-router-dom";
-import axios from 'axios';
-
 
 export default function Login() {
   const navigate = useNavigate();
-  const API_BASE = process.env.REACT_APP_API_BASE;
 
   const onFinish = (values: any) => {
     const { email, password } = values;
@@ -20,15 +17,10 @@ export default function Login() {
     });
 
     user.authenticateUser(authDetails, {
-      onSuccess: async (session) => {
+      onSuccess: (session) => {
         message.success("ログイン成功！");
-      
         localStorage.setItem("accessToken", session.getIdToken().getJwtToken());
         localStorage.setItem("refreshToken", session.getRefreshToken().getToken());
-        const payload = {
-          user_email: email
-        };
-        await axios.post(`${API_BASE}/set_email`, payload);
         localStorage.setItem("user_email", email);
         navigate("/training");
       },
@@ -38,7 +30,7 @@ export default function Login() {
       },
       newPasswordRequired: () => {
         message.warning("初回ログインのため、新しいパスワードが必要です。");
-        navigate("/reset"); // パスワード変更ページへ誘導
+        navigate("/reset");
       },
     });
   };
