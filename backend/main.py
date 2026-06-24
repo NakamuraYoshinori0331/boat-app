@@ -7,7 +7,6 @@ from typing import List
 import pred
 import simulate
 import storage
-import train
 from auth import get_current_user, get_user_email
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,6 +89,8 @@ def train_model(
 
     models_dir = models_dir_for_user(claims)
     try:
+        import train
+
         train.run_train(
             request.model_name,
             request.start_date,

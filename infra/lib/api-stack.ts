@@ -63,13 +63,23 @@ export class ApiStack extends cdk.Stack {
 
     httpApi.addRoutes({
       path: "/{proxy+}",
-      methods: [apigatewayv2.HttpMethod.ANY],
+      methods: [
+        apigatewayv2.HttpMethod.GET,
+        apigatewayv2.HttpMethod.POST,
+        apigatewayv2.HttpMethod.PUT,
+        apigatewayv2.HttpMethod.DELETE,
+      ],
       integration,
     });
 
     httpApi.addRoutes({
       path: "/",
-      methods: [apigatewayv2.HttpMethod.ANY],
+      methods: [
+        apigatewayv2.HttpMethod.GET,
+        apigatewayv2.HttpMethod.POST,
+        apigatewayv2.HttpMethod.PUT,
+        apigatewayv2.HttpMethod.DELETE,
+      ],
       integration: new integrations.HttpLambdaIntegration(
         "RootIntegration",
         apiFn,
