@@ -27,11 +27,15 @@ def get_data(start_date, end_date):
     race_files = [f"{data_dir}/race_{date}.csv" for date in date_range]
     odds_files = [f"{data_dir}/odds_{date}.csv" for date in date_range]
 
-    # 実際に存在するファイルのみ取得
     race_files = [file for file in race_files if glob.glob(file)]
     odds_files = [file for file in odds_files if glob.glob(file)]
 
-    # レースとオッズのデータをまとめる
+    if not race_files or not odds_files:
+        raise ValueError(
+            f"CSVデータが見つかりません ({start_date}〜{end_date})。"
+            f"race={len(race_files)}件, odds={len(odds_files)}件"
+        )
+
     race_data = pd.concat([pd.read_csv(f) for f in race_files], ignore_index=True)
     odds_data = pd.concat([pd.read_csv(f) for f in odds_files], ignore_index=True)
     return race_data, odds_data

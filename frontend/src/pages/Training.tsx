@@ -35,8 +35,9 @@ const Training = () => {
         console.log("失敗")
         message.error('学習に失敗しました。');
       }
-    } catch (err) {
-      message.error('入力内容に誤りがあります。');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      message.error(typeof detail === 'string' ? detail : '学習に失敗しました。');
     } finally {
       setLoading(false);
     }

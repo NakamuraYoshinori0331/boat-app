@@ -1,13 +1,13 @@
 import os
 import shutil
-import subprocess
-import sys
+import traceback
 from datetime import datetime
 from typing import List
 
 import pred
 import simulate
 import storage
+import train
 from auth import get_current_user, get_user_email
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,25 +85,25 @@ def train_model(
     request: TrainRequest,
     claims: dict = Depends(get_current_user),
 ):
+    if not request.features:
+        raise HTTPException(status_code=400, detail="特徴量を1つ以上選択してください")
+
     models_dir = models_dir_for_user(claims)
     try:
-        cmd = [
-            sys.executable, "train.py",
-            "--model_name", request.model_name,
-            "--start_date", request.start_date,
-            "--end_date", request.end_date,
-            "--stadium", request.stadium,
-            "--features", ",".join(request.features),
-            "--models_dir", models_dir,
-        ]
-        subprocess.run(
-            cmd,
-            check=True,
-            cwd=os.environ.get("LAMBDA_TASK_ROOT"),
+        train.run_train(
+            request.model_name,
+            request.start_date,
+            request.end_date,
+            request.stadium,
+            request.features,
+            models_dir,
         )
         storage.sync_models_to_s3(get_user_email(claims))
         return {"message": "学習完了"}
-    except subprocess.CalledProcessError as exc:
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        print("train error:", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

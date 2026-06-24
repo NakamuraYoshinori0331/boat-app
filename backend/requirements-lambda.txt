@@ -8,8 +8,6 @@ numpy
 lightgbm
 scikit-learn
 joblib
-matplotlib
-japanize-matplotlib
 beautifulsoup4
 requests
 tqdm
