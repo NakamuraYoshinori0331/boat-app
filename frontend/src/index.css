@@ -8,6 +8,96 @@ body {
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+/* スマホ向けコンパクト表示 */
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 10px !important;
+    line-height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  .ant-layout-content {
+    padding: 8px !important;
+  }
+
+  .ant-layout-footer {
+    padding: 8px !important;
+    font-size: 11px;
+  }
+
+  .page-compact .ant-form-item {
+    margin-bottom: 12px;
+  }
+
+  .page-compact .ant-form-item-label > label {
+    font-size: 13px;
+  }
+
+  .page-compact .ant-btn {
+    font-size: 13px;
+  }
+
+  .page-compact .ant-table {
+    font-size: 12px;
+  }
+
+  .page-compact .ant-card-head-title {
+    font-size: 14px;
+  }
+
+  .page-compact .ant-alert-message {
+    font-size: 13px;
+  }
+
+  .page-compact .ant-alert-description {
+    font-size: 12px;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: #fff;
+    border-top: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-around;
+    padding: 4px 0 calc(4px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-bottom-nav .nav-item {
+    flex: 1;
+    text-align: center;
+    font-size: 10px;
+    color: #666;
+    padding: 4px 2px;
+    cursor: pointer;
+    border: none;
+    background: none;
+  }
+
+  .mobile-bottom-nav .nav-item.active {
+    color: #1677ff;
+    font-weight: 600;
+  }
+
+  .mobile-bottom-nav .nav-item .anticon {
+    font-size: 18px;
+    display: block;
+    margin: 0 auto 2px;
+  }
+
+  .layout-with-bottom-nav {
+    padding-bottom: 56px;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-bottom-nav {
+    display: none;
+  }
 }

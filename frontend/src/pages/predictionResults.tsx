@@ -1,74 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button } from 'antd';
+import { Table, Button, Card } from 'antd';
 
 interface PredictionItem {
   rank: number;
   combination: string;
-  score: string;
+  score: number;
+  kitaichi: number;
   odds: number;
   popularity: number;
 }
 
+interface PredictionData {
+  predictions: PredictionItem[];
+  sort_by: string;
+  model?: string;
+}
+
 const PredictionResult: React.FC = () => {
   const navigate = useNavigate();
-  const [predictions, setPredictions] = useState<PredictionItem[]>([]);
+  const [data, setData] = useState<PredictionData | null>(null);
 
   useEffect(() => {
-    const storedPredictions = localStorage.getItem('predictions');
+    const stored = localStorage.getItem('predictions');
+    if (!stored) return;
     try {
-      const parsed = storedPredictions ? JSON.parse(storedPredictions) : { predictions: [] };
-
-      // データ形式が予想と異なる場合
-      if (Array.isArray(parsed.predictions)) {
-        setPredictions(parsed.predictions);
-      } else {
-        console.error("予測データが不正です", parsed);
-      }
-    } catch (e) {
-      console.error("予測データの読み込みに失敗しました", e);
+      setData(JSON.parse(stored));
+    } catch {
+      console.error('予測データの読み込みに失敗しました');
     }
   }, []);
 
   const columns = [
-    {
-      title: '順位',
-      dataIndex: 'rank',
-      key: 'rank',
-    },
-    {
-      title: '組番',
-      dataIndex: 'combination',
-      key: 'combination',
-    },
-    {
-      title: '確率 (%)',
-      dataIndex: 'score',
-      key: 'score',
-    },
-    {
-      title: '倍率',
-      dataIndex: 'odds',
-      key: 'odds',
-    },
-    {
-      title: '人気',
-      dataIndex: 'popularity',
-      key: 'popularity',
-    },
+    { title: '順位', dataIndex: 'rank', width: 60 },
+    { title: '組番', dataIndex: 'combination' },
+    { title: '確率 (%)', dataIndex: 'score', render: (v: number) => `${v}%` },
+    { title: '期待値', dataIndex: 'kitaichi', render: (v: number) => v.toFixed(3) },
+    { title: '倍率', dataIndex: 'odds' },
+    { title: '人気', dataIndex: 'popularity' },
   ];
 
+  if (!data?.predictions?.length) {
+    return <Button onClick={() => navigate('/prediction')}>予測に戻る</Button>;
+  }
+
+  const sortLabel = data.sort_by === 'kitaichi' ? '期待値順' : '確率順';
+
   return (
-    <div>
-      <Button onClick={() => navigate('/prediction')} style={{ marginBottom: 16 }}>
+    <div className="page-compact">
+      <Button onClick={() => navigate('/prediction')} style={{ marginBottom: 16 }} size="small">
         予測に戻る
       </Button>
-      <Table
-          dataSource={predictions}
+
+      <Card title={`予測結果（${sortLabel}）${data.model ? ` / ${data.model}` : ''}`}>
+        <Table
+          dataSource={data.predictions}
           columns={columns}
-          rowKey={(_, index) => (index !== undefined ? index.toString() : "0")}
+          rowKey="rank"
           pagination={false}
-      />
+          size="small"
+          scroll={{ x: 320 }}
+        />
+      </Card>
     </div>
   );
 };

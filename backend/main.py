@@ -50,12 +50,17 @@ class RenameRequest(BaseModel):
     new_name: str
 
 
+class BulkDeleteRequest(BaseModel):
+    names: List[str] = []
+
+
 class PredictRequest(BaseModel):
     model: str
     date: str
     place_id: str
     race_no: str
     top_n: str
+    sort_by: str = "probability"
 
 
 class SimulateRequest(BaseModel):
@@ -67,6 +72,9 @@ class SimulateRequest(BaseModel):
     min_odds: float
     max_odds: float
     min_probability: float
+    sort_by: str = "probability"
+    min_kitaichi: float = 0
+    max_bets_per_race: int = 0
 
 
 @app.get("/health")
@@ -138,6 +146,33 @@ def delete_model(name: str, claims: dict = Depends(get_current_user)):
     return {"message": "削除しました"}
 
 
+@app.post("/models/bulk-delete")
+def bulk_delete_models(
+    req: BulkDeleteRequest,
+    claims: dict = Depends(get_current_user),
+):
+    models_dir = models_dir_for_user(claims)
+    email = get_user_email(claims)
+    targets = [n if n.endswith(".pkl") else f"{n}.pkl" for n in req.names]
+
+    deleted = []
+    skipped = []
+    for name in targets:
+        path = os.path.join(models_dir, name)
+        if not os.path.exists(path):
+            skipped.append(name)
+            continue
+        os.remove(path)
+        storage.delete_model_from_s3(email, name)
+        deleted.append(name)
+
+    return {
+        "message": f"{len(deleted)}件削除しました",
+        "deleted": deleted,
+        "skipped": skipped,
+    }
+
+
 @app.put("/models/{name}")
 def rename_model(
     name: str,
@@ -169,15 +204,18 @@ def download_model(name: str, claims: dict = Depends(get_current_user)):
 async def predict(request: PredictRequest, claims: dict = Depends(get_current_user)):
     models_dir = models_dir_for_user(claims)
     try:
+        model = request.model.replace(".pkl", "")
         result = pred.pred(
-            request.model.replace(".pkl", ""),
+            model,
             models_dir,
             request.date,
             request.place_id,
             str(request.race_no),
             str(request.top_n),
+            sort_by=request.sort_by,
         )
-        return {"predictions": result}
+        result["model"] = f"{model}.pkl"
+        return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -186,8 +224,9 @@ async def predict(request: PredictRequest, claims: dict = Depends(get_current_us
 async def simulation(request: SimulateRequest, claims: dict = Depends(get_current_user)):
     models_dir = models_dir_for_user(claims)
     try:
+        model = request.model.replace(".pkl", "")
         result = simulate.simulate(
-            request.model.replace(".pkl", ""),
+            model,
             models_dir,
             request.start_date,
             request.end_date,
@@ -196,7 +235,16 @@ async def simulation(request: SimulateRequest, claims: dict = Depends(get_curren
             request.min_odds,
             request.max_odds,
             request.min_probability,
+            sort_by=request.sort_by,
+            min_kitaichi=request.min_kitaichi,
+            max_bets_per_race=request.max_bets_per_race,
         )
-        return {"simulation": result}
+        return {
+            "simulation": result,
+            "params_used": request.model_dump(),
+            "model": f"{model}.pkl",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

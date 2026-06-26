@@ -42,7 +42,7 @@ def get_data(start_date, end_date):
 
 
 # 上位 n 件の3連単を取得
-def get_top_trifecta(preds_1st, preds_2nd, preds_3rd, odds_df, top_n=5):
+def get_top_trifecta(preds_1st, preds_2nd, preds_3rd, odds_df, top_n=5, sort_by="probability"):
     odds_dict = {
         (row["1位"], row["2位"], row["3位"]): row["倍率"]
         for _, row in odds_df.iterrows()
@@ -69,8 +69,8 @@ def get_top_trifecta(preds_1st, preds_2nd, preds_3rd, odds_df, top_n=5):
                 score = preds_1st[top_1st] * preds_2nd[top_2nd] * preds_3rd[top_3rd]
                 candidates.append((trifecta, score, odds, score * odds))
 
-    # スコア順にソートして上位を取得
-    candidates.sort(key=lambda x: x[1], reverse=True)
+    sort_key = 1 if sort_by == "probability" else 3
+    candidates.sort(key=lambda x: x[sort_key], reverse=True)
     return candidates[:top_n]
 
 
@@ -84,11 +84,11 @@ def is_valid_date(date_str: str) -> bool:
 
 def get_input():
     while True:
-        date = input("日付を選択してください(20210101~20211124)：").strip()
+        date = input("日付を選択してください(YYYYMMDD)：").strip()
         if is_valid_date(date):
             break
         else:
-            print("無効な選択です。正しい日付を入力してください。(20210101~20211124)")
+            print("無効な選択です。正しい日付を入力してください。(YYYYMMDD)")
     race_data, _ = get_data(date, date)
     valid_places = {f"{i:02d}" for i in range(1, 25)}  # "01" から "24"
     while True:

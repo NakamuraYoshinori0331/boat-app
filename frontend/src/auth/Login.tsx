@@ -4,29 +4,48 @@ import { CognitoUser, AuthenticationDetails } from "amazon-cognito-identity-js";
 import UserPool from "../pages/UserPool";
 import { useNavigate } from "react-router-dom";
 
+function saveAuthSession(session: any, email: string): boolean {
+  try {
+    localStorage.setItem("accessToken", session.getIdToken().getJwtToken());
+    localStorage.setItem("refreshToken", session.getRefreshToken().getToken());
+    localStorage.setItem("user_email", email);
+    return true;
+  } catch {
+    message.error(
+      "ログイン情報を保存できません。プライベートブラウズを解除するか、別のブラウザでお試しください。"
+    );
+    return false;
+  }
+}
+
 export default function Login() {
   const navigate = useNavigate();
 
   const onFinish = (values: any) => {
     const { email, password } = values;
-    const user = new CognitoUser({ Username: email, Pool: UserPool });
+    const user = new CognitoUser({ Username: email.trim(), Pool: UserPool });
 
     const authDetails = new AuthenticationDetails({
-      Username: email,
+      Username: email.trim(),
       Password: password,
     });
 
     user.authenticateUser(authDetails, {
       onSuccess: (session) => {
+        if (!saveAuthSession(session, email.trim())) {
+          return;
+        }
         message.success("ログイン成功！");
-        localStorage.setItem("accessToken", session.getIdToken().getJwtToken());
-        localStorage.setItem("refreshToken", session.getRefreshToken().getToken());
-        localStorage.setItem("user_email", email);
         navigate("/training");
       },
       onFailure: (err) => {
         console.error("Login error:", err);
-        message.error(err.message);
+        const msg = err.message || "ログインに失敗しました";
+        if (msg.includes("Network")) {
+          message.error("通信エラーです。回線を確認して再試行してください。");
+          return;
+        }
+        message.error(msg);
       },
       newPasswordRequired: () => {
         message.warning("初回ログインのため、新しいパスワードが必要です。");
@@ -36,17 +55,36 @@ export default function Login() {
   };
 
   return (
-    <Card title="ログイン" style={{ width: 400, margin: "40px auto" }}>
-      <Form onFinish={onFinish}>
-        <Form.Item name="email" rules={[{ required: true }]}>
-          <Input placeholder="メールアドレス" />
+    <Card
+      title="ログイン"
+      style={{
+        width: "min(400px, calc(100vw - 32px))",
+        margin: "24px auto",
+      }}
+    >
+      <Form onFinish={onFinish} layout="vertical">
+        <Form.Item
+          name="email"
+          label="メールアドレス"
+          rules={[{ required: true, type: "email", message: "メールアドレスを入力してください" }]}
+        >
+          <Input
+            type="email"
+            inputMode="email"
+            autoComplete="username"
+            placeholder="example@email.com"
+          />
         </Form.Item>
 
-        <Form.Item name="password" rules={[{ required: true }]}>
-          <Input.Password placeholder="パスワード" />
+        <Form.Item
+          name="password"
+          label="パスワード"
+          rules={[{ required: true, message: "パスワードを入力してください" }]}
+        >
+          <Input.Password autoComplete="current-password" placeholder="パスワード" />
         </Form.Item>
 
-        <Button type="primary" htmlType="submit" block>
+        <Button type="primary" htmlType="submit" block size="large">
           ログイン
         </Button>
       </Form>
