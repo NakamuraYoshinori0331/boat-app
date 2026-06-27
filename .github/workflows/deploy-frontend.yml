@@ -53,6 +53,19 @@ jobs:
             --exclude "static/*" \
             --cache-control "no-cache, no-store, must-revalidate"
 
+      - name: Verify S3 upload
+        working-directory: frontend
+        run: |
+          LOCAL_JS=$(grep -o 'main\.[^"]*\.js' build/index.html | head -1)
+          REMOTE_JS=$(aws s3 cp "s3://${{ env.S3_BUCKET }}/index.html" - | grep -o 'main\.[^"]*\.js' | head -1)
+          echo "Local bundle:  $LOCAL_JS"
+          echo "Remote bundle: $REMOTE_JS"
+          if [ "$LOCAL_JS" != "$REMOTE_JS" ]; then
+            echo "S3 index.html does not match the build output"
+            exit 1
+          fi
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/static/js/$LOCAL_JS"
+
       - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \

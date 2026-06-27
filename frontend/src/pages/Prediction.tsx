@@ -85,7 +85,7 @@ const Prediction = () => {
 
         <Form.Item label="表示順" name="sort_by">
           <Select>
-            <Option value="probability">確率順</Option>
+            <Option value="probability">AI確率順</Option>
             <Option value="kitaichi">期待値順</Option>
           </Select>
         </Form.Item>

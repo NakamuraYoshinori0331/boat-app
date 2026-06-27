@@ -5,17 +5,29 @@ import { Table, Button, Card } from 'antd';
 interface PredictionItem {
   rank: number;
   combination: string;
+  probability: number;
   score: number;
   kitaichi: number;
   odds: number;
   popularity: number;
 }
 
+interface BoatProbability {
+  boat: number;
+  racer: string;
+  prob_1st: number;
+  prob_2nd: number;
+  prob_3rd: number;
+}
+
 interface PredictionData {
   predictions: PredictionItem[];
+  boat_probabilities?: BoatProbability[];
   sort_by: string;
   model?: string;
 }
+
+const formatProb = (v: number) => `${v.toFixed(2)}%`;
 
 const PredictionResult: React.FC = () => {
   const navigate = useNavigate();
@@ -31,10 +43,23 @@ const PredictionResult: React.FC = () => {
     }
   }, []);
 
-  const columns = [
+  const boatColumns = [
+    { title: '艇', dataIndex: 'boat', width: 48 },
+    { title: '選手', dataIndex: 'racer', ellipsis: true },
+    { title: '1着', dataIndex: 'prob_1st', render: formatProb },
+    { title: '2着', dataIndex: 'prob_2nd', render: formatProb },
+    { title: '3着', dataIndex: 'prob_3rd', render: formatProb },
+  ];
+
+  const trifectaColumns = [
     { title: '順位', dataIndex: 'rank', width: 60 },
     { title: '組番', dataIndex: 'combination' },
-    { title: '確率 (%)', dataIndex: 'score', render: (v: number) => `${v}%` },
+    {
+      title: 'AI確率',
+      dataIndex: 'probability',
+      render: (_: number, record: PredictionItem) =>
+        formatProb(record.probability ?? record.score),
+    },
     { title: '期待値', dataIndex: 'kitaichi', render: (v: number) => v.toFixed(3) },
     { title: '倍率', dataIndex: 'odds' },
     { title: '人気', dataIndex: 'popularity' },
@@ -44,7 +69,7 @@ const PredictionResult: React.FC = () => {
     return <Button onClick={() => navigate('/prediction')}>予測に戻る</Button>;
   }
 
-  const sortLabel = data.sort_by === 'kitaichi' ? '期待値順' : '確率順';
+  const sortLabel = data.sort_by === 'kitaichi' ? '期待値順' : 'AI確率順';
 
   return (
     <div className="page-compact">
@@ -52,14 +77,27 @@ const PredictionResult: React.FC = () => {
         予測に戻る
       </Button>
 
-      <Card title={`予測結果（${sortLabel}）${data.model ? ` / ${data.model}` : ''}`}>
+      {data.boat_probabilities && data.boat_probabilities.length > 0 && (
+        <Card title="各艇のAI予測確率" style={{ marginBottom: 16 }}>
+          <Table
+            dataSource={data.boat_probabilities}
+            columns={boatColumns}
+            rowKey="boat"
+            pagination={false}
+            size="small"
+            scroll={{ x: 360 }}
+          />
+        </Card>
+      )}
+
+      <Card title={`3連単候補（${sortLabel}）${data.model ? ` / ${data.model}` : ''}`}>
         <Table
           dataSource={data.predictions}
-          columns={columns}
+          columns={trifectaColumns}
           rowKey="rank"
           pagination={false}
           size="small"
-          scroll={{ x: 320 }}
+          scroll={{ x: 360 }}
         />
       </Card>
     </div>
