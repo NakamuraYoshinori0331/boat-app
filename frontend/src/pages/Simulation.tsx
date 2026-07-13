@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Form, Button, Select, DatePicker, InputNumber, Typography, Divider, message,
 } from 'antd';
@@ -6,16 +6,25 @@ import dayjs from 'dayjs';
 import api from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { STADIUM_OPTIONS } from '../constants/stadiums';
+import { useDataDateRange } from '../hooks/useDataDateRange';
+import { useJobPolling } from '../hooks/useJobPolling';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
+interface SimulationResponse {
+  simulation: Record<string, unknown>;
+  params_used: Record<string, unknown>;
+  model: string;
+}
+
 const Simulation = () => {
-  const [models, setModels] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [models, setModels] = React.useState<{ name: string }[]>([]);
   const navigate = useNavigate();
   const [form] = Form.useForm();
+  const { loading: rangeLoading, range, disabledDate, defaultSimRange } = useDataDateRange();
+  const { status, submitAndWait } = useJobPolling<SimulationResponse>();
 
   useEffect(() => {
     api.get('/models')
@@ -23,8 +32,24 @@ const Simulation = () => {
       .catch(() => message.error('モデルの取得に失敗しました'));
   }, []);
 
-  const onFinish = async (values: any) => {
-    setLoading(true);
+  useEffect(() => {
+    if (!rangeLoading && range?.min_date) {
+      form.setFieldsValue({ daterange: defaultSimRange });
+    }
+  }, [rangeLoading, range, defaultSimRange, form]);
+
+  const onFinish = async (values: {
+    model: string;
+    daterange: [dayjs.Dayjs, dayjs.Dayjs];
+    stadium: string;
+    top_n: number;
+    min_odds: number;
+    max_odds: number;
+    min_probability: number;
+    sort_by: string;
+    min_kitaichi: number;
+    max_bets_per_race: number;
+  }) => {
     const payload = {
       model: values.model,
       start_date: values.daterange[0].format('YYYYMMDD'),
@@ -40,11 +65,11 @@ const Simulation = () => {
     };
 
     try {
-      const res = await api.post('/simulation', payload);
-      const result = res.data.simulation;
-      const fullResult = { ...res.data, conditions: payload };
+      const res = await submitAndWait('/simulation', payload);
+      const result = res.simulation;
+      const fullResult = { ...res, conditions: payload };
 
-      if (!result || result.total_bet === 0) {
+      if (!result || (result as { total_bet?: number }).total_bet === 0) {
         message.info('条件に一致するベットがありませんでした');
         navigate('/simulation_results', { state: { conditions: payload, result: null } });
         return;
@@ -54,22 +79,36 @@ const Simulation = () => {
       localStorage.setItem('simulation_result', JSON.stringify(result));
       navigate('/simulation_results', { state: { conditions: payload, result } });
       message.success('シミュレーションが完了しました');
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail || 'シミュレーションに失敗しました');
+    } catch (e: unknown) {
+      const detail = (e as Error)?.message;
+      if (detail && detail !== 'キャンセルされました') {
+        message.error(detail);
+      }
     }
-    setLoading(false);
   };
+
+  const isLoading = status === 'submitting' || status === 'running';
+  const loadingLabel = status === 'running' ? 'シミュレーション中（バックグラウンド処理）...' : '送信中...';
 
   return (
     <div className="page-compact">
       <Title level={4}>🎲 シミュレーション</Title>
+
+      {range?.min_date && range?.max_date && (
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          利用可能データ: {dayjs(range.min_date, 'YYYYMMDD').format('YYYY-MM-DD')}
+          {' 〜 '}
+          {dayjs(range.max_date, 'YYYYMMDD').format('YYYY-MM-DD')}
+          （{range.count}日分）
+        </Text>
+      )}
 
       <Form
         form={form}
         layout="vertical"
         onFinish={onFinish}
         initialValues={{
-          daterange: [dayjs().subtract(30, 'day'), dayjs()],
+          daterange: defaultSimRange,
           stadium: 'ALL',
           top_n: 20,
           min_odds: 5,
@@ -89,7 +128,12 @@ const Simulation = () => {
         </Form.Item>
 
         <Form.Item label="対象日付範囲" name="daterange" rules={[{ required: true }]}>
-          <RangePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <RangePicker
+            format="YYYY-MM-DD"
+            style={{ width: '100%' }}
+            disabledDate={disabledDate}
+            disabled={rangeLoading}
+          />
         </Form.Item>
 
         <Divider orientation="left">🎯 詳細ルール</Divider>
@@ -130,8 +174,8 @@ const Simulation = () => {
         </Form.Item>
 
         <Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading}>
-            シミュレーション実行
+          <Button type="primary" htmlType="submit" loading={isLoading}>
+            {isLoading ? loadingLabel : 'シミュレーション実行'}
           </Button>
         </Form.Item>
       </Form>

@@ -3,6 +3,8 @@ import * as cdk from "aws-cdk-lib";
 import * as acm from "aws-cdk-lib/aws-certificatemanager";
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as route53 from "aws-cdk-lib/aws-route53";
@@ -20,6 +22,13 @@ export class ApiStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
 
+    const jobsTable = new dynamodb.Table(this, "JobsTable", {
+      partitionKey: { name: "job_id", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: "ttl",
+    });
+
     const apiFn = new lambda.DockerImageFunction(this, "ApiFunction", {
       code: lambda.DockerImageCode.fromImageAsset(
         path.join(__dirname, "../../backend"),
@@ -31,6 +40,7 @@ export class ApiStack extends cdk.Stack {
         MODELS_BUCKET: props.modelsBucket.bucketName,
         DATA_DIR: "/tmp/data",
         MODELS_ROOT: "/tmp/models",
+        JOBS_TABLE: jobsTable.tableName,
         COGNITO_USER_POOL_ID: config.cognitoUserPoolId,
         COGNITO_CLIENT_ID: config.cognitoClientId,
         ALLOWED_ORIGINS: `https://${config.domainName},http://localhost:3000`,
@@ -38,8 +48,16 @@ export class ApiStack extends cdk.Stack {
       logRetention: logs.RetentionDays.ONE_WEEK,
     });
 
+    jobsTable.grantReadWriteData(apiFn);
     props.dataBucket.grantRead(apiFn);
     props.modelsBucket.grantReadWrite(apiFn);
+
+    apiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["lambda:InvokeFunction"],
+        resources: [apiFn.functionArn],
+      }),
+    );
 
     const httpApi = new apigatewayv2.HttpApi(this, "HttpApi", {
       apiName: "boat-app-api",

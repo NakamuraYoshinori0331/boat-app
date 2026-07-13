@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select } from 'antd';
-import api from '../api/client';
+import React, { useEffect, useState } from 'react';
+import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { STADIUM_OPTIONS, customModelName } from '../constants/stadiums';
+import { useDataDateRange } from '../hooks/useDataDateRange';
+import { useJobPolling } from '../hooks/useJobPolling';
+
+const { Text } = Typography;
 
 const allFeatures = [
   '全国勝率', '全国2連率', '全国3連率', '当地勝率', '当地2連率', '当地3連率',
@@ -12,14 +15,23 @@ const allFeatures = [
 
 const Training = () => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(allFeatures);
+  const { loading: rangeLoading, range, disabledDate, defaultTrainRange } = useDataDateRange();
+  const { status, submitAndWait } = useJobPolling<{ message: string }>();
+
+  useEffect(() => {
+    if (!rangeLoading && range?.min_date) {
+      form.setFieldsValue({
+        start_date: defaultTrainRange.start,
+        end_date: defaultTrainRange.end,
+      });
+    }
+  }, [rangeLoading, range, defaultTrainRange, form]);
 
   const handleTrain = async () => {
     try {
       const values = await form.validateFields();
-      setLoading(true);
 
       const payload = {
         model_name: values.model_name,
@@ -29,37 +41,45 @@ const Training = () => {
         features: selectedFeatures,
       };
 
-      const response = await api.post('/train', payload);
-      if (response.status === 200) {
-        setModalVisible(true);
-      } else {
-        message.error('学習に失敗しました。');
+      await submitAndWait('/train', payload);
+      setModalVisible(true);
+    } catch (err: unknown) {
+      const detail = (err as Error)?.message;
+      if (detail && detail !== 'キャンセルされました') {
+        message.error(detail);
       }
-    } catch (err: any) {
-      const detail = err?.response?.data?.detail;
-      message.error(typeof detail === 'string' ? detail : '学習に失敗しました。');
-    } finally {
-      setLoading(false);
     }
   };
 
   const onCheckAll = () => setSelectedFeatures(allFeatures);
   const onUncheckAll = () => setSelectedFeatures([]);
-  const onFeatureChange = (checkedValues: any) => setSelectedFeatures(checkedValues);
+  const onFeatureChange = (checkedValues: string[]) => setSelectedFeatures(checkedValues);
 
   const onStadiumChange = (stadium: string) => {
     form.setFieldValue('model_name', customModelName(stadium));
   };
 
+  const isLoading = status === 'submitting' || status === 'running';
+  const loadingLabel = status === 'running' ? '学習中（バックグラウンド処理）...' : '送信中...';
+
   return (
     <div className="page-compact">
+      {range?.min_date && range?.max_date && (
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          利用可能データ: {dayjs(range.min_date, 'YYYYMMDD').format('YYYY-MM-DD')}
+          {' 〜 '}
+          {dayjs(range.max_date, 'YYYYMMDD').format('YYYY-MM-DD')}
+          （{range.count}日分）
+        </Text>
+      )}
+
       <Form
         form={form}
         layout="vertical"
         initialValues={{
           model_name: customModelName('ALL'),
-          start_date: dayjs().subtract(1, 'year'),
-          end_date: dayjs(),
+          start_date: defaultTrainRange.start,
+          end_date: defaultTrainRange.end,
           stadium: 'ALL',
         }}
       >
@@ -68,11 +88,21 @@ const Training = () => {
         </Form.Item>
 
         <Form.Item label="データ開始日" name="start_date" rules={[{ required: true }]}>
-          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <DatePicker
+            format="YYYY-MM-DD"
+            style={{ width: '100%' }}
+            disabledDate={disabledDate}
+            disabled={rangeLoading}
+          />
         </Form.Item>
 
         <Form.Item label="データ終了日" name="end_date" rules={[{ required: true }]}>
-          <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+          <DatePicker
+            format="YYYY-MM-DD"
+            style={{ width: '100%' }}
+            disabledDate={disabledDate}
+            disabled={rangeLoading}
+          />
         </Form.Item>
 
         <Form.Item
@@ -104,8 +134,8 @@ const Training = () => {
         </Form.Item>
 
         <Form.Item>
-          <Button type="primary" onClick={handleTrain} loading={loading} disabled={loading}>
-            {loading ? '学習中...' : '学習を開始'}
+          <Button type="primary" onClick={handleTrain} loading={isLoading} disabled={isLoading}>
+            {isLoading ? loadingLabel : '学習を開始'}
           </Button>
         </Form.Item>
       </Form>

@@ -4,14 +4,25 @@ import traceback
 from datetime import datetime
 from typing import List
 
+import data_dates
+import jobs
 import pred
 import simulate
 import storage
 from auth import get_current_user, get_user_email
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+
+STADIUM_NAMES = {
+    "01": "桐生", "02": "戸田", "03": "江戸川", "04": "平和島",
+    "05": "多摩川", "06": "浜名湖", "07": "蒲郡", "08": "常滑",
+    "09": "津", "10": "三国", "11": "琵琶湖", "12": "住之江",
+    "13": "尼崎", "14": "鳴門", "15": "丸亀", "16": "児島",
+    "17": "宮島", "18": "徳山", "19": "下関", "20": "若松",
+    "21": "芦屋", "22": "福岡", "23": "唐津", "24": "大村",
+}
 
 app = FastAPI()
 
@@ -87,6 +98,59 @@ async def protected_route(claims: dict = Depends(get_current_user)):
     return {"message": "OK", "user": get_user_email(claims)}
 
 
+@app.get("/data/date-range")
+def get_data_date_range(claims: dict = Depends(get_current_user)):
+    return data_dates.get_date_range()
+
+
+@app.get("/jobs/{job_id}")
+def get_job_status(job_id: str, claims: dict = Depends(get_current_user)):
+    if not jobs.jobs_enabled():
+        raise HTTPException(status_code=404, detail="ジョブ機能は利用できません")
+
+    job = jobs.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
+    if job.get("user_email") != get_user_email(claims):
+        raise HTTPException(status_code=403, detail="このジョブにアクセスできません")
+
+    return {
+        "job_id": job["job_id"],
+        "job_type": job["job_type"],
+        "status": job["status"],
+        "result": job.get("result"),
+        "error": job.get("error") or None,
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+    }
+
+
+def _submit_job(job_type: str, payload: dict, claims: dict):
+    email = get_user_email(claims)
+    job_id = jobs.create_job(email, job_type, payload)
+    jobs.invoke_async(job_id, job_type, email)
+    return JSONResponse(
+        status_code=202,
+        content={"job_id": job_id, "status": "pending", "message": "ジョブを開始しました"},
+    )
+
+
+def _run_train_sync(request: TrainRequest, claims: dict):
+    models_dir = models_dir_for_user(claims)
+    import train
+
+    train.run_train(
+        request.model_name,
+        request.start_date,
+        request.end_date,
+        request.stadium,
+        request.features,
+        models_dir,
+    )
+    storage.sync_models_to_s3(get_user_email(claims))
+    return {"message": "学習完了"}
+
+
 @app.post("/train")
 def train_model(
     request: TrainRequest,
@@ -95,20 +159,10 @@ def train_model(
     if not request.features:
         raise HTTPException(status_code=400, detail="特徴量を1つ以上選択してください")
 
-    models_dir = models_dir_for_user(claims)
     try:
-        import train
-
-        train.run_train(
-            request.model_name,
-            request.start_date,
-            request.end_date,
-            request.stadium,
-            request.features,
-            models_dir,
-        )
-        storage.sync_models_to_s3(get_user_email(claims))
-        return {"message": "学習完了"}
+        if jobs.jobs_enabled():
+            return _submit_job("train", request.model_dump(), claims)
+        return _run_train_sync(request, claims)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -215,35 +269,50 @@ async def predict(request: PredictRequest, claims: dict = Depends(get_current_us
             sort_by=request.sort_by,
         )
         result["model"] = f"{model}.pkl"
+        place_name = STADIUM_NAMES.get(request.place_id, request.place_id)
+        dt = datetime.strptime(request.date, "%Y%m%d")
+        result["race_info"] = {
+            "date": request.date,
+            "date_label": f"{dt.month}月{dt.day}日",
+            "place_id": request.place_id,
+            "place_name": place_name,
+            "race_no": int(request.race_no),
+        }
         return result
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+def _run_simulation_sync(request: SimulateRequest, claims: dict):
+    models_dir = models_dir_for_user(claims)
+    model = request.model.replace(".pkl", "")
+    result = simulate.simulate(
+        model,
+        models_dir,
+        request.start_date,
+        request.end_date,
+        request.stadium,
+        request.top_n,
+        request.min_odds,
+        request.max_odds,
+        request.min_probability,
+        sort_by=request.sort_by,
+        min_kitaichi=request.min_kitaichi,
+        max_bets_per_race=request.max_bets_per_race,
+    )
+    return {
+        "simulation": result,
+        "params_used": request.model_dump(),
+        "model": f"{model}.pkl",
+    }
+
+
 @app.post("/simulation")
 async def simulation(request: SimulateRequest, claims: dict = Depends(get_current_user)):
-    models_dir = models_dir_for_user(claims)
     try:
-        model = request.model.replace(".pkl", "")
-        result = simulate.simulate(
-            model,
-            models_dir,
-            request.start_date,
-            request.end_date,
-            request.stadium,
-            request.top_n,
-            request.min_odds,
-            request.max_odds,
-            request.min_probability,
-            sort_by=request.sort_by,
-            min_kitaichi=request.min_kitaichi,
-            max_bets_per_race=request.max_bets_per_race,
-        )
-        return {
-            "simulation": result,
-            "params_used": request.model_dump(),
-            "model": f"{model}.pkl",
-        }
+        if jobs.jobs_enabled():
+            return _submit_job("simulation", request.model_dump(), claims)
+        return _run_simulation_sync(request, claims)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button, Card } from 'antd';
+import { Table, Button, Card, Typography } from 'antd';
+
+const { Title, Text } = Typography;
 
 interface PredictionItem {
   rank: number;
@@ -20,11 +22,20 @@ interface BoatProbability {
   prob_3rd: number;
 }
 
+interface RaceInfo {
+  date: string;
+  date_label: string;
+  place_id: string;
+  place_name: string;
+  race_no: number;
+}
+
 interface PredictionData {
   predictions: PredictionItem[];
   boat_probabilities?: BoatProbability[];
   sort_by: string;
   model?: string;
+  race_info?: RaceInfo;
 }
 
 const formatProb = (v: number) => `${v.toFixed(2)}%`;
@@ -70,12 +81,24 @@ const PredictionResult: React.FC = () => {
   }
 
   const sortLabel = data.sort_by === 'kitaichi' ? '期待値順' : 'AI確率順';
+  const raceInfo = data.race_info;
 
   return (
     <div className="page-compact">
       <Button onClick={() => navigate('/prediction')} style={{ marginBottom: 16 }} size="small">
         予測に戻る
       </Button>
+
+      {raceInfo && (
+        <Card style={{ marginBottom: 16 }}>
+          <Title level={5} style={{ margin: 0 }}>
+            {raceInfo.place_name}　{raceInfo.date_label}　第{raceInfo.race_no}レース
+          </Title>
+          {data.model && (
+            <Text type="secondary">モデル: {data.model}</Text>
+          )}
+        </Card>
+      )}
 
       {data.boat_probabilities && data.boat_probabilities.length > 0 && (
         <Card title="各艇のAI予測確率" style={{ marginBottom: 16 }}>
