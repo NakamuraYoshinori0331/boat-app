@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Button, Card, Typography } from 'antd';
+import { Table, Button, Card, Typography, Space, message } from 'antd';
+import { RightOutlined } from '@ant-design/icons';
+import api from '../api/client';
 
 const { Title, Text } = Typography;
+
+const MAX_RACE_NO = 12;
 
 interface PredictionItem {
   rank: number;
@@ -36,6 +40,14 @@ interface PredictionData {
   sort_by: string;
   model?: string;
   race_info?: RaceInfo;
+  params?: {
+    model: string;
+    date: string;
+    place_id: string;
+    race_no: string;
+    top_n: string;
+    sort_by: string;
+  };
 }
 
 const formatProb = (v: number) => `${v.toFixed(2)}%`;
@@ -43,6 +55,7 @@ const formatProb = (v: number) => `${v.toFixed(2)}%`;
 const PredictionResult: React.FC = () => {
   const navigate = useNavigate();
   const [data, setData] = useState<PredictionData | null>(null);
+  const [loadingNext, setLoadingNext] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('predictions');
@@ -53,6 +66,51 @@ const PredictionResult: React.FC = () => {
       console.error('予測データの読み込みに失敗しました');
     }
   }, []);
+
+  const getParams = (predictionData: PredictionData) => {
+    if (predictionData.params) return predictionData.params;
+    if (!predictionData.race_info || !predictionData.model) return null;
+    return {
+      model: predictionData.model,
+      date: predictionData.race_info.date,
+      place_id: predictionData.race_info.place_id,
+      race_no: String(predictionData.race_info.race_no),
+      top_n: String(predictionData.predictions.length),
+      sort_by: predictionData.sort_by,
+    };
+  };
+
+  const handleNextRace = async () => {
+    if (!data) return;
+    const params = getParams(data);
+    if (!params) {
+      message.error('予測条件を取得できませんでした');
+      return;
+    }
+
+    const currentRace = Number(params.race_no);
+    if (currentRace >= MAX_RACE_NO) return;
+
+    const nextPayload = {
+      ...params,
+      race_no: String(currentRace + 1),
+    };
+
+    setLoadingNext(true);
+    try {
+      const res = await api.post('/predict', nextPayload);
+      if (!res.data.predictions?.length) {
+        throw new Error('結果がありません');
+      }
+      const stored = { ...res.data, params: nextPayload };
+      localStorage.setItem('predictions', JSON.stringify(stored));
+      setData(stored);
+      message.success(`第${currentRace + 1}レースの予測が完了しました`);
+    } catch {
+      message.error('次のレースの予測に失敗しました');
+    }
+    setLoadingNext(false);
+  };
 
   const boatColumns = [
     { title: '艇', dataIndex: 'boat', width: 48 },
@@ -82,12 +140,30 @@ const PredictionResult: React.FC = () => {
 
   const sortLabel = data.sort_by === 'kitaichi' ? '期待値順' : 'AI確率順';
   const raceInfo = data.race_info;
+  const params = getParams(data);
+  const currentRaceNo = raceInfo?.race_no ?? Number(params?.race_no ?? 0);
+  const canPredictNext = Boolean(params && currentRaceNo > 0 && currentRaceNo < MAX_RACE_NO);
+  const isLastRace = Boolean(currentRaceNo && currentRaceNo >= MAX_RACE_NO);
 
   return (
     <div className="page-compact">
-      <Button onClick={() => navigate('/prediction')} style={{ marginBottom: 16 }} size="small">
-        予測に戻る
-      </Button>
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Button onClick={() => navigate('/prediction')} size="small">
+          予測に戻る
+        </Button>
+        <Button
+          type="primary"
+          icon={<RightOutlined />}
+          size="small"
+          loading={loadingNext}
+          disabled={!canPredictNext || loadingNext}
+          onClick={handleNextRace}
+        >
+          {isLastRace
+            ? '最終レースです'
+            : `第${currentRaceNo + 1}レースを予測（同じ条件）`}
+        </Button>
+      </Space>
 
       {raceInfo && (
         <Card style={{ marginBottom: 16 }}>

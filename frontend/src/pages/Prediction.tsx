@@ -45,7 +45,7 @@ const Prediction = () => {
       if (!res.data.predictions?.length) {
         throw new Error('結果がありません');
       }
-      localStorage.setItem('predictions', JSON.stringify(res.data));
+      localStorage.setItem('predictions', JSON.stringify({ ...res.data, params: payload }));
       navigate('/results');
       message.success('予測が完了しました');
     } catch {
