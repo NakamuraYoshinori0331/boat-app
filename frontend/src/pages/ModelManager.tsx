@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Popconfirm, Input, Modal, message, Space } from 'antd';
+import { Table, Button, Popconfirm, Input, Modal, message, Space, Empty } from 'antd';
 import type { TableProps } from 'antd';
+import { ReloadOutlined } from '@ant-design/icons';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
+import PageIntro from '../components/PageIntro';
 
 interface ModelRow {
   name: string;
@@ -16,15 +19,21 @@ const ModelManager: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const fetchModels = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/models');
+      setModels(res.data);
+      setSelected([]);
+    } catch {
+      message.error('モデルの取得に失敗しました');
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
     fetchModels();
   }, []);
-
-  const fetchModels = async () => {
-    const res = await api.get('/models');
-    setModels(res.data);
-    setSelected([]);
-  };
 
   const handleDelete = async (name: string) => {
     await api.delete(`/models/${encodeURIComponent(name)}`);
@@ -38,8 +47,9 @@ const ModelManager: React.FC = () => {
       const res = await api.post('/models/bulk-delete', { names: selected });
       message.success(res.data.message);
       fetchModels();
-    } catch (e: any) {
-      message.error(e?.response?.data?.detail || '一括削除に失敗しました');
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      message.error(detail || '一括削除に失敗しました');
     }
     setLoading(false);
   };
@@ -47,7 +57,7 @@ const ModelManager: React.FC = () => {
   const handleRename = async () => {
     if (!renamingModel || !newName) return;
     await api.put(`/models/${encodeURIComponent(renamingModel)}`, { new_name: newName });
-    message.success('リネームしました');
+    message.success('名前を変更しました');
     setRenamingModel(null);
     setNewName('');
     fetchModels();
@@ -71,9 +81,9 @@ const ModelManager: React.FC = () => {
   };
 
   const columns = [
-    { title: 'モデル', dataIndex: 'name' },
-    { title: 'サイズ', dataIndex: 'size' },
-    { title: '更新', dataIndex: 'modified' },
+    { title: 'モデル名', dataIndex: 'name' },
+    { title: 'サイズ', dataIndex: 'size', width: 90 },
+    { title: '更新日時', dataIndex: 'modified' },
     {
       title: '操作',
       width: 120,
@@ -86,7 +96,7 @@ const ModelManager: React.FC = () => {
           <Popconfirm title="削除しますか？" onConfirm={() => handleDelete(record.name)}>
             <Button size="small" danger block>削除</Button>
           </Popconfirm>
-          <Button size="small" block onClick={() => handleDownload(record.name)}>DL</Button>
+          <Button size="small" block onClick={() => handleDownload(record.name)}>ダウンロード</Button>
         </Space>
       ),
     },
@@ -94,7 +104,21 @@ const ModelManager: React.FC = () => {
 
   return (
     <div className="page-compact">
+      <PageIntro
+        title="モデル一覧"
+        description="学習で作ったAIモデルがここに表示されます。予測・シミュレーションで使うモデルを確認できます。"
+        steps={[
+          '学習完了後、この画面でモデルが表示されているか確認する',
+          '表示されない場合は「一覧を更新」を押す',
+          'まだない場合は「学習」から作り直す',
+        ]}
+        guideAnchor="models"
+      />
+
       <Space wrap style={{ marginBottom: 12 }}>
+        <Button icon={<ReloadOutlined />} onClick={fetchModels} loading={loading} size="small">
+          一覧を更新
+        </Button>
         <Popconfirm
           title={`選択した${selected.length}件を削除しますか？`}
           disabled={selected.length === 0}
@@ -106,15 +130,24 @@ const ModelManager: React.FC = () => {
         </Popconfirm>
       </Space>
 
-      <Table
-        rowKey="name"
-        dataSource={models}
-        columns={columns}
-        rowSelection={rowSelection}
-        size="small"
-        scroll={{ x: 360 }}
-        pagination={{ pageSize: 10, size: 'small' }}
-      />
+      {models.length === 0 && !loading ? (
+        <Empty description="まだモデルがありません">
+          <Link to="/training">
+            <Button type="primary">学習ページへ</Button>
+          </Link>
+        </Empty>
+      ) : (
+        <Table
+          rowKey="name"
+          dataSource={models}
+          columns={columns}
+          rowSelection={rowSelection}
+          loading={loading}
+          size="small"
+          scroll={{ x: 360 }}
+          pagination={{ pageSize: 10, size: 'small' }}
+        />
+      )}
 
       <Modal
         title="モデル名の変更"
@@ -122,7 +155,7 @@ const ModelManager: React.FC = () => {
         onCancel={() => setRenamingModel(null)}
         onOk={handleRename}
       >
-        <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="新しいモデル名" />
       </Modal>
     </div>
   );

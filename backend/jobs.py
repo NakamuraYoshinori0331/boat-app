@@ -144,7 +144,7 @@ def _run_train(payload: dict, user_email: str) -> dict:
     import train
 
     models_dir = _models_dir_for_email(user_email)
-    train.run_train(
+    file_path = train.run_train(
         payload["model_name"],
         payload["start_date"],
         payload["end_date"],
@@ -152,8 +152,16 @@ def _run_train(payload: dict, user_email: str) -> dict:
         payload["features"],
         models_dir,
     )
+    model_file = os.path.basename(file_path)
+    storage.upload_model(user_email, model_file)
     storage.sync_models_to_s3(user_email)
-    return {"message": "学習完了"}
+    models = storage.list_models_metadata(user_email)
+    if not any(m["name"] == model_file for m in models):
+        raise RuntimeError(f"モデルの保存確認に失敗しました: {model_file}")
+    return {
+        "message": "学習完了",
+        "model": model_file,
+    }
 
 
 def _run_simulation(payload: dict, user_email: str) -> dict:

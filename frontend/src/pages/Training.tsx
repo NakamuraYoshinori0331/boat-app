@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select, Typography } from 'antd';
+import { Button, Modal, message, Form, Input, DatePicker, Checkbox, Row, Col, Select } from 'antd';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import { STADIUM_OPTIONS, customModelName } from '../constants/stadiums';
 import { useDataDateRange } from '../hooks/useDataDateRange';
 import { useJobPolling } from '../hooks/useJobPolling';
-
-const { Text } = Typography;
+import PageIntro from '../components/PageIntro';
 
 const allFeatures = [
   '全国勝率', '全国2連率', '全国3連率', '当地勝率', '当地2連率', '当地3連率',
@@ -13,12 +13,19 @@ const allFeatures = [
   '展示タイム', '枠', 'チルト', '進入'
 ];
 
+interface TrainResult {
+  message: string;
+  model?: string;
+}
+
 const Training = () => {
   const [form] = Form.useForm();
   const [modalVisible, setModalVisible] = useState(false);
+  const [savedModel, setSavedModel] = useState<string | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(allFeatures);
+  const navigate = useNavigate();
   const { loading: rangeLoading, range, disabledDate, defaultTrainRange } = useDataDateRange();
-  const { status, submitAndWait } = useJobPolling<{ message: string }>();
+  const { status, submitAndWait } = useJobPolling<TrainResult>();
 
   useEffect(() => {
     if (!rangeLoading && range?.min_date) {
@@ -41,7 +48,8 @@ const Training = () => {
         features: selectedFeatures,
       };
 
-      await submitAndWait('/train', payload);
+      const result = await submitAndWait('/train', payload);
+      setSavedModel(result.model || `${values.model_name}.pkl`);
       setModalVisible(true);
     } catch (err: unknown) {
       const detail = (err as Error)?.message;
@@ -64,13 +72,24 @@ const Training = () => {
 
   return (
     <div className="page-compact">
+      <PageIntro
+        title="AIモデルの学習"
+        description="過去のレースデータから、予測に使うAIモデルを作成します。最初にここから始めてください。"
+        steps={[
+          'モデル名と学習期間を選ぶ（期間が長いほど時間がかかります）',
+          '「学習を開始」を押す',
+          '完了後、「モデル一覧」で保存されたか確認する',
+        ]}
+        guideAnchor="training"
+      />
+
       {range?.min_date && range?.max_date && (
-        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          利用可能データ: {dayjs(range.min_date, 'YYYYMMDD').format('YYYY-MM-DD')}
+        <p style={{ color: '#666', marginBottom: 12, fontSize: 13 }}>
+          選べるデータ期間: {dayjs(range.min_date, 'YYYYMMDD').format('YYYY-MM-DD')}
           {' 〜 '}
           {dayjs(range.max_date, 'YYYYMMDD').format('YYYY-MM-DD')}
           （{range.count}日分）
-        </Text>
+        </p>
       )}
 
       <Form
@@ -83,31 +102,49 @@ const Training = () => {
           stadium: 'ALL',
         }}
       >
-        <Form.Item label="モデル名" name="model_name" rules={[{ required: true, message: 'モデル名を入力してください' }]}>
+        <Form.Item
+          label="モデル名"
+          name="model_name"
+          tooltip="あとから一覧で識別するための名前です"
+          rules={[{ required: true, message: 'モデル名を入力してください' }]}
+        >
           <Input placeholder="例: custom_venue_桐生" />
         </Form.Item>
 
-        <Form.Item label="データ開始日" name="start_date" rules={[{ required: true }]}>
+        <Form.Item
+          label="データ開始日"
+          name="start_date"
+          tooltip="学習に使う期間の始まり"
+          rules={[{ required: true }]}
+        >
           <DatePicker
             format="YYYY-MM-DD"
             style={{ width: '100%' }}
             disabledDate={disabledDate}
             disabled={rangeLoading}
+            placeholder="開始日を選択"
           />
         </Form.Item>
 
-        <Form.Item label="データ終了日" name="end_date" rules={[{ required: true }]}>
+        <Form.Item
+          label="データ終了日"
+          name="end_date"
+          tooltip="学習に使う期間の終わり"
+          rules={[{ required: true }]}
+        >
           <DatePicker
             format="YYYY-MM-DD"
             style={{ width: '100%' }}
             disabledDate={disabledDate}
             disabled={rangeLoading}
+            placeholder="終了日を選択"
           />
         </Form.Item>
 
         <Form.Item
           label="レース場"
           name="stadium"
+          tooltip="全場まとめて学習するか、特定の場に絞るか"
           rules={[{ required: true, message: 'レース場を選択してください' }]}
         >
           <Select
@@ -117,7 +154,10 @@ const Training = () => {
           />
         </Form.Item>
 
-        <Form.Item label="使用する特徴量">
+        <Form.Item
+          label="使用する特徴量"
+          tooltip="初めての方はそのままで問題ありません"
+        >
           <Row gutter={[8, 8]}>
             <Col><Button onClick={onCheckAll}>全選択</Button></Col>
             <Col><Button onClick={onUncheckAll}>全クリア</Button></Col>
@@ -134,20 +174,32 @@ const Training = () => {
         </Form.Item>
 
         <Form.Item>
-          <Button type="primary" onClick={handleTrain} loading={isLoading} disabled={isLoading}>
+          <Button type="primary" onClick={handleTrain} loading={isLoading} disabled={isLoading} block>
             {isLoading ? loadingLabel : '学習を開始'}
           </Button>
         </Form.Item>
       </Form>
 
       <Modal
-        title="✅ 学習完了"
+        title="学習が完了しました"
         open={modalVisible}
-        onOk={() => setModalVisible(false)}
         onCancel={() => setModalVisible(false)}
-        okText="OK"
+        footer={[
+          <Button key="close" onClick={() => setModalVisible(false)}>閉じる</Button>,
+          <Button key="models" type="primary" onClick={() => navigate('/models')}>
+            モデル一覧を確認
+          </Button>,
+        ]}
       >
-        <p>モデルの学習が正常に完了しました！</p>
+        <p>AIモデルの学習が完了しました。</p>
+        {savedModel && (
+          <p>
+            保存されたモデル: <strong>{savedModel}</strong>
+          </p>
+        )}
+        <p style={{ color: '#666', marginBottom: 0 }}>
+          次は「モデル一覧」で表示を確認し、「予測」画面で使ってみてください。
+        </p>
       </Modal>
     </div>
   );

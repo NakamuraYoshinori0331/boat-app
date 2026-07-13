@@ -9,6 +9,7 @@ import {
   DatabaseOutlined,
   MenuOutlined,
   LogoutOutlined,
+  QuestionCircleOutlined,
 } from "@ant-design/icons";
 import Training from "./pages/Training";
 import Prediction from "./pages/Prediction";
@@ -16,6 +17,7 @@ import Simulation from "./pages/Simulation";
 import Results from "./pages/predictionResults";
 import SimulationResults from "./pages/SimulationResults";
 import ModelManager from "./pages/ModelManager";
+import Guide from "./pages/Guide";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 import ResetPassword from "./auth/ResetPassword";
@@ -30,12 +32,13 @@ const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
 };
 
 const navItems = [
+  { key: "guide", icon: <QuestionCircleOutlined />, label: "使い方", path: "/guide" },
   { key: "training", icon: <LaptopOutlined />, label: "学習", path: "/training" },
+  { key: "models", icon: <DatabaseOutlined />, label: "モデル", path: "/models" },
   { key: "prediction", icon: <BarChartOutlined />, label: "予測", path: "/prediction" },
   { key: "simulation", icon: <ExperimentOutlined />, label: "シミュ", path: "/simulation" },
   { key: "results", icon: <FileSearchOutlined />, label: "予測結果", path: "/results" },
   { key: "simulation_results", icon: <FileSearchOutlined />, label: "Sim結果", path: "/simulation_results" },
-  { key: "models", icon: <DatabaseOutlined />, label: "モデル", path: "/models" },
 ];
 
 const AppLayout: React.FC = () => {
@@ -47,7 +50,7 @@ const AppLayout: React.FC = () => {
   const isMobile = !screens.md;
   const isLoggedIn = !!localStorage.getItem("accessToken");
 
-  const selectedKey = navItems.find((item) => location.pathname === item.path)?.key || "training";
+  const selectedKey = navItems.find((item) => location.pathname === item.path)?.key || "guide";
 
   const handleNav = (key: string) => {
     if (key === "logout") {
@@ -155,7 +158,8 @@ const AppLayout: React.FC = () => {
         >
           <Content className="page-compact">
             <Routes>
-              <Route path="/" element={<Navigate to="/training" replace />} />
+              <Route path="/" element={<Navigate to="/guide" replace />} />
+              <Route path="/guide" element={<ProtectedRoute><Guide /></ProtectedRoute>} />
               <Route path="/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
               <Route path="/prediction" element={<ProtectedRoute><Prediction /></ProtectedRoute>} />
               <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />

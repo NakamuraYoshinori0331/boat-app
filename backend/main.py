@@ -139,7 +139,8 @@ def _run_train_sync(request: TrainRequest, claims: dict):
     models_dir = models_dir_for_user(claims)
     import train
 
-    train.run_train(
+    email = get_user_email(claims)
+    file_path = train.run_train(
         request.model_name,
         request.start_date,
         request.end_date,
@@ -147,8 +148,10 @@ def _run_train_sync(request: TrainRequest, claims: dict):
         request.features,
         models_dir,
     )
-    storage.sync_models_to_s3(get_user_email(claims))
-    return {"message": "学習完了"}
+    model_file = os.path.basename(file_path)
+    storage.upload_model(email, model_file)
+    storage.sync_models_to_s3(email)
+    return {"message": "学習完了", "model": model_file}
 
 
 @app.post("/train")
@@ -172,6 +175,10 @@ def train_model(
 
 @app.get("/models")
 def list_models(claims: dict = Depends(get_current_user)):
+    email = get_user_email(claims)
+    if os.environ.get("MODELS_BUCKET"):
+        return storage.list_models_metadata(email)
+
     models_dir = models_dir_for_user(claims)
     files = []
     for fname in os.listdir(models_dir):
@@ -186,6 +193,7 @@ def list_models(claims: dict = Depends(get_current_user)):
                 "size": f"{size // 1024} KB",
                 "modified": mtime,
             })
+    files.sort(key=lambda item: item["modified"], reverse=True)
     return files
 
 
