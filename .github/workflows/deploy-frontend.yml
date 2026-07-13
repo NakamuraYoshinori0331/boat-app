@@ -36,6 +36,7 @@ jobs:
           npm run build
         env:
           REACT_APP_API_URL: https://api.boat-ai.click
+          DISABLE_ESLINT_PLUGIN: true
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4

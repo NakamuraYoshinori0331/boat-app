@@ -6,4 +6,6 @@ const poolData = {
   ClientId: cognitoConfig.ClientId,
 };
 
-export default new CognitoUserPool(poolData);
+const userPool = new CognitoUserPool(poolData);
+
+export default userPool;
