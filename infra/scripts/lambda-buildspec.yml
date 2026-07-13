@@ -1,0 +1,10 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - unzip backend-src.zip
+      - aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin 008116135513.dkr.ecr.ap-northeast-1.amazonaws.com
+  build:
+    commands:
+      - docker build -t 008116135513.dkr.ecr.ap-northeast-1.amazonaws.com/cdk-hnb659fds-container-assets-008116135513-ap-northeast-1:5dc7d5df1fd83add152032f3b58c60caa3a42920cc3af667d011df6ac46bdcfc .
+      - docker push 008116135513.dkr.ecr.ap-northeast-1.amazonaws.com/cdk-hnb659fds-container-assets-008116135513-ap-northeast-1:5dc7d5df1fd83add152032f3b58c60caa3a42920cc3af667d011df6ac46bdcfc

@@ -55,7 +55,9 @@ export class ApiStack extends cdk.Stack {
     apiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["lambda:InvokeFunction"],
-        resources: [apiFn.functionArn],
+        resources: [
+          `arn:aws:lambda:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:function:${cdk.Stack.of(this).stackName}-ApiFunction*`,
+        ],
       }),
     );
 

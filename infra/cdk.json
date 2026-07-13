@@ -16,7 +16,6 @@
   },
   "context": {
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
-    "@aws-cdk/core:checkSecretUsage": true,
-    "@aws-cdk/core:defaultCrossStackReferences": "weak"
+    "@aws-cdk/core:checkSecretUsage": true
   }
 }
